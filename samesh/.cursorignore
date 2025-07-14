@@ -1,9 +1,22 @@
 # 数据目录
+/data/*
+!/data/.gitkeep
 
+segmentation/data/img/*
+segmentation/data/urdf/*
+segmentation/data/predict/*
+segmentation/data/samesh_result/*
+segmentation/data/urdf_angle/*
 
-partfield/model/*
-data/img/*
-data/urdf/*
+segmentation/outputs/*
+
+# 模型检查点
+/singapo/exps/*
+!/singapo/exps/.gitkeep
+
+/javascript/segmentation/*
+javascript/urdf/*
+javascript/urdf_source/*
 
 # demo 生成的输出
 /singapo/demo/demo_output/*

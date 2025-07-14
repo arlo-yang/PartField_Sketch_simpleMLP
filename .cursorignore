@@ -1,7 +1,7 @@
 # 数据目录
 
 
-model/*
+partfield/model/*
 data/img/*
 data/urdf/*
 
