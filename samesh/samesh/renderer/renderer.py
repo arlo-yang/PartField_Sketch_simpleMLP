@@ -1,4 +1,9 @@
 import os
+import sys
+
+# 调整导入路径为samesh目录（而非PartField_Sketch_simpleMLP目录）
+sys.path.insert(0, '/hy-tmp/PartField_Sketch_simpleMLP/samesh')
+
 # 尝试使用 osmesa 后端
 os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
 os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
@@ -28,6 +33,7 @@ from trimesh import Trimesh, Scene
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+# 使用绝对导入
 from samesh.data.common import NumpyTensor
 from samesh.data.loaders import scene2mesh
 from samesh.utils.cameras import HomogeneousTransform, sample_view_matrices, sample_view_matrices_polyhedra
@@ -330,16 +336,17 @@ def render_multiview(
 
 
 if __name__ == '__main__':
-    from PIL import Image
-    from samesh.data.loaders import read_mesh, read_scene, remove_texture, scene2mesh
-    from samesh.models.shape_diameter_function import shape_diameter_function, colormap_shape_diameter_function, prep_mesh_shape_diameter_function
-
-    # 测试不同格式的模型
-    models = [
-        '/hy-tmp/samesh/assets/potion.glb',      # glb格式
-        '/hy-tmp/samesh/assets/yy_merged.obj',               # obj格式
-        '/hy-tmp/samesh/assets/jacket.glb'       # glb格式
-    ]
+    """
+    使用位于/hy-tmp/PartField_Sketch_simpleMLP/data/urdf/7119/yy_merged.obj的几何体模型
+    图片保存在这个脚本同级的文件夹render_images中
+    """
+  
+    # 创建保存渲染图像的目录
+    save_dir = os.path.join(os.path.dirname(__file__), 'render_images')
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 修改后的模型路径
+    model_path = '/hy-tmp/PartField_Sketch_simpleMLP/data/urdf/7119/yy_merged.obj'
 
     pose = np.array([
         [ 1,  0,  0,  0],
@@ -349,23 +356,21 @@ if __name__ == '__main__':
     ])
 
     renderer = Renderer(OmegaConf.create({
-        'target_dim': (1024, 1024),
+        'target_dim': (512, 512),
     }))
     
     # 测试 OBJ 模型加载和渲染
     try:
         # 使用 trimesh 加载 OBJ 文件
         import trimesh
-        source = trimesh.load(models[1])  # 加载 OBJ 文件
+        source = trimesh.load(model_path)  # 加载 OBJ 文件
         
         # 如果模型太大或太小，可以进行缩放
         source.vertices -= source.center_mass  # 将模型中心移到原点
         scale = 1.0 / np.max(np.abs(source.vertices))  # 计算缩放因子
         source.vertices *= scale  # 应用缩放
         
-        # 准备渲染
-        source = prep_mesh_shape_diameter_function(source)
-        source = colormap_shape_diameter_function(source, shape_diameter_function(source))
+        # 移除shape_diameter相关调用
         
         renderer.set_object(source)
         renderer.set_camera()
@@ -373,20 +378,30 @@ if __name__ == '__main__':
         
         # 打印模型信息
         print(f"\n模型信息:")
+        print(f"模型路径: {model_path}")
         print(f"顶点数量: {len(source.vertices)}")
         print(f"面片数量: {len(source.faces)}")
         print(f"渲染尺寸: {renders['matte'].shape}")
         
-        # 保存渲染结果
+        # 保存渲染结果到render_images目录
         for k, v in renders.items():
-            print(f"{k}: {v.shape}")
+            if k != 'faces' and k != 'poses':
+                print(f"{k}: {v.shape}")
         
+        # 保存各种渲染图像
         image = Image.fromarray(renders['matte'])
-        image.save('test_matte_obj.png')
+        image.save(os.path.join(save_dir, 'test_matte_obj.png'))
+        
         image_faceids = colormap_faces(renders['faces'])
-        image_faceids.save('test_faceids_obj.png')
+        image_faceids.save(os.path.join(save_dir, 'test_faceids_obj.png'))
+        
         image_norms = colormap_norms(renders['norms'])
-        image_norms.save('test_norms_obj.png')
+        image_norms.save(os.path.join(save_dir, 'test_norms_obj.png'))
+        
+        print(f"渲染结果已保存到: {save_dir}")
         
     except Exception as e:
         print(f"加载或渲染OBJ文件时出错: {e}")
+        
+        
+        
