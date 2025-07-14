@@ -45,6 +45,7 @@ def process_urdf_directory(urdf_dir, dry_run=False):
     # 特殊文件: yy_merged.obj 可能在 yy_object 目录下
     special_file = "yy_merged.obj"
     special_dir = "yy_object"
+    special_subdir = "yy_visualization" # 需要从yy_object中保留的子目录
     
     processed = 0
     for id_dir in id_dirs:
@@ -54,17 +55,29 @@ def process_urdf_directory(urdf_dir, dry_run=False):
         for item in os.listdir(id_path):
             item_path = os.path.join(id_path, item)
             
-            # 处理yy_object目录 - 只保留yy_merged.obj
+            # 处理yy_object目录 - 保留yy_merged.obj和yy_visualization目录
             if item == special_dir and os.path.isdir(item_path):
                 if not dry_run:
-                    # 检查是否存在yy_merged.obj
+                    # 检查是否存在yy_merged.obj并移动
                     obj_file = os.path.join(item_path, special_file)
                     if os.path.exists(obj_file):
                         # 将yy_merged.obj移动到上一级目录
                         shutil.copy2(obj_file, os.path.join(id_path, special_file))
                         print(f"  - 移动 {obj_file} 到 {id_path}/{special_file}")
                 
-                # 删除整个yy_object目录
+                    # 检查是否存在yy_visualization并移动
+                    vis_dir = os.path.join(item_path, special_subdir)
+                    if os.path.exists(vis_dir) and os.path.isdir(vis_dir):
+                        # 如果目标目录已存在，先删除
+                        target_vis_dir = os.path.join(id_path, special_subdir)
+                        if os.path.exists(target_vis_dir):
+                            shutil.rmtree(target_vis_dir)
+                        
+                        # 将yy_visualization移动到上一级目录
+                        shutil.copytree(vis_dir, target_vis_dir)
+                        print(f"  - 移动 {vis_dir} 到 {target_vis_dir}")
+                
+                # 删除yy_object目录
                 if not dry_run:
                     shutil.rmtree(item_path)
                     print(f"  - 删除目录: {item_path}")

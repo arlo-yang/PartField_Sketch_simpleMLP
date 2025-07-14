@@ -162,6 +162,7 @@ def predict(cfg):
             # 记录开始时间
             start_time = time.time()
             
+
             # 调用原始predict_step的核心逻辑
             # 使用PVCNN提取点云特征
             pc_feat = self.pvcnn(batch['pc'], batch['pc'])
@@ -176,28 +177,44 @@ def predict(cfg):
             # 处理网格数据
             from partfield.model.PVCNN.encoder_pc import sample_triplane_feat
             
-            # 在三角形面上采样点
+            # 在三角形面上采样点云
             def sample_points(vertices, faces, n_point_per_face):
-                # 生成随机重心坐标
+                # 分批处理面，每批处理1000个面
+                batch_size = 1000
                 n_f = faces.shape[0]
-                u = torch.sqrt(torch.rand((n_f, n_point_per_face, 1),
-                                         device=vertices.device,
-                                         dtype=vertices.dtype))
-                v = torch.rand((n_f, n_point_per_face, 1),
-                              device=vertices.device,
-                              dtype=vertices.dtype)
-                w0 = 1 - u
-                w1 = u * (1 - v)
-                w2 = u * v
-
-                # 获取三角形的三个顶点
-                face_v_0 = torch.index_select(vertices, 0, faces[:, 0].reshape(-1))
-                face_v_1 = torch.index_select(vertices, 0, faces[:, 1].reshape(-1))
-                face_v_2 = torch.index_select(vertices, 0, faces[:, 2].reshape(-1))
+                all_points = []
                 
-                # 使用重心坐标生成点
-                points = w0 * face_v_0.unsqueeze(dim=1) + w1 * face_v_1.unsqueeze(dim=1) + w2 * face_v_2.unsqueeze(dim=1)
-                return points
+                for i in range(0, n_f, batch_size):
+                    # 当前批次的面数
+                    batch_faces = faces[i:min(i+batch_size, n_f)]
+                    batch_n_f = batch_faces.shape[0]
+                    
+                    # 生成随机重心坐标
+                    u = torch.sqrt(torch.rand((batch_n_f, n_point_per_face, 1),
+                                           device=vertices.device,
+                                           dtype=vertices.dtype))
+                    v = torch.rand((batch_n_f, n_point_per_face, 1),
+                                device=vertices.device,
+                                dtype=vertices.dtype)
+                    w0 = 1 - u
+                    w1 = u * (1 - v)
+                    w2 = u * v
+
+                    # 获取三角形的三个顶点
+                    face_v_0 = torch.index_select(vertices, 0, batch_faces[:, 0].reshape(-1))
+                    face_v_1 = torch.index_select(vertices, 0, batch_faces[:, 1].reshape(-1))
+                    face_v_2 = torch.index_select(vertices, 0, batch_faces[:, 2].reshape(-1))
+                    
+                    # 使用重心坐标生成点
+                    batch_points = w0 * face_v_0.unsqueeze(dim=1) + w1 * face_v_1.unsqueeze(dim=1) + w2 * face_v_2.unsqueeze(dim=1)
+                    all_points.append(batch_points)
+                    
+                    # 主动清理内存
+                    del u, v, w0, w1, w2, face_v_0, face_v_1, face_v_2, batch_points
+                    torch.cuda.empty_cache()
+                
+                # 合并所有批次的结果
+                return torch.cat(all_points, dim=0)
 
             def sample_and_mean_memory_save_version(part_planes, tensor_vertices, n_point_per_face):
                 # 每批处理的点数

@@ -43,7 +43,7 @@ cfg: !!python/object/new:yacs.config.CfgNode
     num_neg_hard_pc: 128
     num_neg_random: 256
     num_pos: 64
-    output_dir: results/test/250713-232303
+    output_dir: results/test/250714-010007
     preprocess_mesh: false
     pvcnn: !!python/object/new:yacs.config.CfgNode
       dictitems:
