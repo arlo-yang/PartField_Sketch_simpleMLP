@@ -116,7 +116,8 @@ def visualize_items(items: dict, path: Path, model_id: str = None, face_labels: 
     plt.axis('off')
     
     plt.subplot(2, 4, 3)
-    norms = np.ones_like(faces, dtype=np.float32)[:, :, None].repeat(3, axis=2)
+    # 使用items中的真实法线，而不是硬编码的全1法线
+    norms = items['norms'][0]  # 使用渲染器提供的真实法线
     visibility_mask = norms_mask(norms, pose, threshold=0.0) & (faces != -1)
     visible_faces_img = np.zeros((faces.shape[0], faces.shape[1], 3), dtype=np.uint8)
     visible_faces_img[visibility_mask] = [0, 0, 255]  
@@ -317,7 +318,8 @@ class SegmentationModelMesh(nn.Module):
             'faces': [output['faces']],
             'poses': np.array([output['poses']]),
             'view_names': [output['view_name']],
-            'view_indices': [output['view_index']]
+            'view_indices': [output['view_index']],
+            'norms': [output['norms']]  # 添加这一行
         }
         mask = self.call_segmentation(None, output['faces'] != -1, view_index="custom")
         renders['bmasks'] = [mask]

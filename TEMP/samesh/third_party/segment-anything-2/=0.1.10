@@ -1,0 +1,13 @@
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple
+Collecting hydra-core
+  Downloading https://mirrors.aliyun.com/pypi/packages/c6/50/e0edd38dcd63fb26a8547f13d28f7a008bc4a3fd4eb4ff030673f22ad41a/hydra_core-1.3.2-py3-none-any.whl (154 kB)
+Requirement already satisfied: iopath in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (0.1.10)
+Requirement already satisfied: omegaconf<2.4,>=2.2 in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from hydra-core) (2.3.0)
+Requirement already satisfied: antlr4-python3-runtime==4.9.* in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from hydra-core) (4.9.3)
+Requirement already satisfied: packaging in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from hydra-core) (24.2)
+Requirement already satisfied: tqdm in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from iopath) (4.67.1)
+Requirement already satisfied: typing-extensions in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from iopath) (4.12.2)
+Requirement already satisfied: portalocker in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from iopath) (3.1.1)
+Requirement already satisfied: PyYAML>=5.1.0 in /usr/local/miniconda3/envs/singapo/lib/python3.10/site-packages (from omegaconf<2.4,>=2.2->hydra-core) (6.0.2)
+Installing collected packages: hydra-core
+Successfully installed hydra-core-1.3.2

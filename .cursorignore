@@ -4,7 +4,8 @@
 partfield/model/*
 data/img/*
 data/urdf/*
-
+PartField_Sketch_simpleMLP/data_small/*
+data_small/*
 
 # 大文件
 *.pt

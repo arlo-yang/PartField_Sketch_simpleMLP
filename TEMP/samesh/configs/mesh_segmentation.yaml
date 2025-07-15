@@ -1,0 +1,42 @@
+---
+cache: ./outputs/mesh_segmentation_cache  # 缓存目录，存储中间结果
+cache_overwrite: False  # 是否覆盖已有缓存
+output: ./outputs/mesh_segmentation_output  # 输出目录，存储最终结果
+
+sam:
+  sam:
+    checkpoint: /home/ipab-graphics/workplace/User_web_dev/samesh/checkpoint/sam2.1_hiera_large.pt  # SAM2模型权重文件路径
+    model_config: /home/ipab-graphics/workplace/User_web_dev/samesh/checkpoint/sam2.1_hiera_l.yaml  # SAM2模型配置文件路径
+    auto: True  # 使用自动分割模式
+    ground: False  # 是否使用Grounding DINO进行目标检测
+    engine_config:
+      points_per_side: 32  # 每边采样点数，控制分割的细粒度
+      crop_n_layers: 0  # 裁剪层数，0表示不裁剪
+      #min_mask_region_area: 1024  # 最小掩码区域面积（SAM2不支持）
+      pred_iou_thresh: 0.5  # 预测IoU阈值
+      stability_score_thresh: 0.7  # 稳定性得分阈值
+      stability_score_offset: 1.0  # 稳定性得分偏移
+
+sam_mesh:
+  face2label_threshold: 2  # 面片最少需要覆盖的像素数，从16降低到2
+  use_percentage_threshold: true  # 是否使用比例阈值代替绝对像素数阈值
+  threshold_percentage: 50.0  # 面片中覆盖的分割掩码像素比例阈值，默认50%
+  use_modes: ['sdf', 'norms']  # 使用的渲染模式：形状直径函数和法线图
+  min_area: 512  # 最小分割区域面积，1024
+  connections_bin_resolution: 100  # 连接分箱分辨率
+  connections_bin_threshold_percentage: 0.125  # 连接分箱阈值百分比
+  smoothing_threshold_percentage_size: 0.025  # 平滑阈值（尺寸百分比）
+  smoothing_threshold_percentage_area: 0.025  # 平滑阈值（面积百分比）
+  smoothing_iterations: 64  # 平滑迭代次数
+  repartition_cost: 1  # 重分区成本
+  repartition_lambda: 6  # 重分区lambda参数
+  repartition_iterations: 1  # 重分区迭代次数
+
+renderer:
+  target_dim: [512, 512]  # 渲染目标分辨率
+  camera_generation_method: icosahedron  # 相机位置生成方法：二十面体采样
+  renderer_args:
+    interpolate_norms: True  # 是否对法线进行插值
+  sampling_args: 
+    radius: 3.35  # 相机采样半径
+  lighting_args: {}  # 光照参数（空）

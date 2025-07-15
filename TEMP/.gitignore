@@ -1,0 +1,55 @@
+# 忽略数据目录
+/data/*
+!/data/.gitkeep
+
+segmentation/data/*
+segmentation/outputs/*
+
+# 忽略模型检查点
+/singapo/exps/*
+!/singapo/exps/.gitkeep
+
+/javascript/segmentation/*
+javascript/urdf/*
+javascript/urdf_single/*
+javascript/urdf_single/*
+
+# 忽略 demo 生成的输出
+/singapo/demo/demo_output/*
+!/singapo/demo/demo_output/pred_graph.json
+!/singapo/demo/demo_output/pred_graph.png
+
+
+# 忽略预训练模型
+/singapo/pretrained/*
+!/singapo/pretrained/.gitkeep
+
+# 忽略大文件
+*.pt
+*.ckpt
+*.pack
+*.wandb
+
+/samesh/checkpoint/*
+/samesh/outputs/*
+
+# 忽略常见的系统文件
+.DS_Store
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 忽略环境相关
+.venv
+env/
+venv/
+ENV/
+
+# 忽略日志文件
+*.log
+
+# 忽略 IDE 相关
+.idea/
+.vscode/
+*.swp
+*.swo
