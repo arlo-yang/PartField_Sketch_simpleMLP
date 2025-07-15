@@ -1,8 +1,5 @@
 import os
-import sys
 
-# 调整导入路径为samesh目录（而非PartField_Sketch_simpleMLP目录）
-sys.path.insert(0, '/hy-tmp/PartField_Sketch_simpleMLP/samesh')
 
 # 尝试使用 osmesa 后端
 os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
@@ -33,13 +30,13 @@ from trimesh import Trimesh, Scene
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
-# 使用绝对导入
-from samesh.data.common import NumpyTensor
-from samesh.data.loaders import scene2mesh
-from samesh.utils.cameras import HomogeneousTransform, sample_view_matrices, sample_view_matrices_polyhedra
-from samesh.utils.math import range_norm
-from samesh.utils.mesh import duplicate_verts
-from samesh.renderer.shader_programs import *
+# 改用相对导入
+from ..data.common import NumpyTensor
+from ..data.loaders import scene2mesh
+from ..utils.cameras import HomogeneousTransform, sample_view_matrices, sample_view_matrices_polyhedra
+from ..utils.math import range_norm
+from ..utils.mesh import duplicate_verts
+from .shader_programs import *
 
 
 def colormap_faces(faces: NumpyTensor['h w'], background=np.array([255, 255, 255])) -> Image.Image:

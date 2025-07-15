@@ -1,6 +1,6 @@
 import torch
 
-from samesh.data.common import TorchTensor
+from ..data.common import NumpyTensor, TorchTensor
 
 
 def discretize(t: TorchTensor, lb=-1, ub=1, resolution=128) -> TorchTensor:

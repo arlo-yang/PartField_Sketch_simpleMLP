@@ -4,7 +4,7 @@ import numpy as np
 import pyrender
 from trimesh import Trimesh
 
-from samesh.data.common import NumpyTensor
+from ..data.common import NumpyTensor
 
 SHADERS_PATH = os.path.join(os.path.dirname(__file__), 'shaders')
 

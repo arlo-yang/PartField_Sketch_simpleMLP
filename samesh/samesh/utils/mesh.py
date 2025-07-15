@@ -2,8 +2,7 @@ import numpy as np
 import trimesh
 from trimesh.base import Trimesh, Scene
 
-from samesh.data.common import NumpyTensor, TorchTensor
-
+from ..data.common import NumpyTensor, TorchTensor
 
 def duplicate_verts(mesh: Trimesh) -> Trimesh:
     """
@@ -101,7 +100,7 @@ def norm_scene(scene: Scene) -> Scene:
 
 
 if __name__ == "__main__":
-    from samesh.data.loaders import read_mesh
+    from samesh.loaders import read_mesh
     mesh = read_mesh('/home/ubuntu/meshseg/tests/examples/0ba4ae3aa97b4298866a2903de4fd1e7.glb')
     
     mesh.export('/home/ubuntu/meshseg/tests/examples/0ba4ae3aa97b4298866a2903de4fd1e7.obj')

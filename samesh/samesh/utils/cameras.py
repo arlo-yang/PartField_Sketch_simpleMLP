@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from samesh.data.common import NumpyTensor, TorchTensor
-from samesh.utils.polyhedra import *
+from ..data.common import NumpyTensor, TorchTensor
+from .polyhedra import *
 
 
 HomogeneousTransform = NumpyTensor['b... 4 4'] | TorchTensor['b... 4 4']

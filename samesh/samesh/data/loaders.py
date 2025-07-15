@@ -1,15 +1,16 @@
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import trimesh
 from trimesh.base import Trimesh, ColorVisuals, Scene
-
-from samesh.data.common import NumpyTensor
-from samesh.utils.mesh import transform, norm_mesh, norm_scene, handle_pose
-
+from ..utils.mesh import transform, norm_mesh, norm_scene, handle_pose
 from trimesh.scene import transforms
 
+from torchtyping import TensorType
+
+
+NumpyTensor = TensorType
+TorchTensor = TensorType
 
 COLORS = {
     'material_diffuse' : np.array([102, 102, 102, 255], dtype=np.uint8),
