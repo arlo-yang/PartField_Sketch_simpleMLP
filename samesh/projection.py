@@ -27,89 +27,16 @@ from samesh.data.common import NumpyTensor
 from samesh.renderer.renderer import Renderer, render_multiview, colormap_faces, colormap_norms
 from samesh.utils.cameras import *
 from samesh.utils.mesh import duplicate_verts
-
+from samesh.utils.camera_views import VIEW_POSITIONS, distance
 # ------------------------------------------------------------------------------
 #                               固定路径配置
 # ------------------------------------------------------------------------------
 PREDICT_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/img"
 URDF_DIR    = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf"
 RESULT_DIR  = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/result"
-FAILURE_DIR = os.path.join(RESULT_DIR, "failure")   # 新增：集中放失败 PNG
-# 修正配置文件路径计算
+FAILURE_DIR = os.path.join(RESULT_DIR, "failure")
 CONFIG_FILE = Path(__file__).resolve().parent / "configs" / "mesh_segmentation.yaml"
 
-# ------------------------------------------------------------------------------
-#                                视角定义
-# ------------------------------------------------------------------------------
-distance = 2.5
-VIEW_POSITIONS = {
-    "top-left": {
-        "position": [-distance * math.cos(math.pi/4) * math.sin(math.pi/4),
-                     distance * math.sin(math.pi/4),
-                     distance * math.cos(math.pi/4) * math.cos(math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "left": {
-        "position": [-distance * math.cos(0) * math.sin(math.pi/4),
-                     distance * math.sin(0),
-                     distance * math.cos(0) * math.cos(math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "bottom-left": {
-        "position": [-distance * math.cos(-math.pi/4) * math.sin(math.pi/4),
-                     distance * math.sin(-math.pi/4),
-                     distance * math.cos(-math.pi/4) * math.cos(math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "top-center": {
-        "position": [-distance * math.cos(math.pi/4) * math.sin(0),
-                     distance * math.sin(math.pi/4),
-                     distance * math.cos(math.pi/4) * math.cos(0)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "center": {
-        "position": [0.0, 0.0, distance],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "bottom-center": {
-        "position": [-distance * math.cos(-math.pi/4) * math.sin(0),
-                     distance * math.sin(-math.pi/4),
-                     distance * math.cos(-math.pi/4) * math.cos(0)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "top-right": {
-        "position": [-distance * math.cos(math.pi/4) * math.sin(-math.pi/4),
-                     distance * math.sin(math.pi/4),
-                     distance * math.cos(math.pi/4) * math.cos(-math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "right": {
-        "position": [-distance * math.cos(0) * math.sin(-math.pi/4),
-                     distance * math.sin(0),
-                     distance * math.cos(0) * math.cos(-math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "bottom-right": {
-        "position": [-distance * math.cos(-math.pi/4) * math.sin(-math.pi/4),
-                     distance * math.sin(-math.pi/4),
-                     distance * math.cos(-math.pi/4) * math.cos(-math.pi/4)],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    },
-    "custom": {
-        "position": [0.0, 0.0, distance],
-        "target": [0.0, 0.0, 0.0],
-        "up": [0.0, 1.0, 0.0]
-    }
-}
 
 # ------------------------------------------------------------------------------
 #                       预测文件名解析正则 + 工具函数
