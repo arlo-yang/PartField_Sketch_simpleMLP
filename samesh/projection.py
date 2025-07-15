@@ -1,28 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Batch-enabled sam_mesh.py
 
-* 遍历:
-    /hy-tmp/PartField_Sketch/segmentation/data/predict
-    /hy-tmp/PartField_Sketch/segmentation/data/urdf
-* 匹配 ID → OBJ
-* 读取 view / joint
-* 调用原本管线一次处理一对
-* 结果写入:
-    /hy-tmp/PartField_Sketch/segmentation/data/samesh_result/
-      {class}_{id}_segmentation_{view}_joint_{k}/...
-      
-      
-看这里！！！！！！！！！！！！！！！！！！！！
-我们现在做一些调整：
-1. 时刻记住不要修改模型代码，我们只是调整文件输入输出
-2. 输入的prediction图片在/hy-tmp/PartField_Sketch_simpleMLP/data_small/img
-3. img和之前一样，命名提供了view：
-/hy-tmp/PartField_Sketch_simpleMLP/data_small/img/Dishwasher_11622_segmentation_bottom_center_joint_0.png，这个是/hy-tmp/PartField_Sketch_simpleMLP/data_small/img/{类别}_{id}_{render mode}_{view}_joint_{joint_id}.png
-3. 输入的几何体在/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf/{id}/yy_merged.obj
-输出的放在/hy-tmp/PartField_Sketch_simpleMLP/data_small/result
-"""
 
 # ------------------------------------------------------------------------------
 #                                  Imports
@@ -41,6 +19,7 @@ from trimesh.base import Trimesh, Scene
 from tqdm import tqdm
 from natsort import natsorted
 import matplotlib.pyplot as plt
+import inspect
 
 # project-internal
 from samesh.data.loaders import remove_texture, read_mesh
@@ -182,100 +161,107 @@ def colormap_mask(
     image_blend = np.clip(image_blend, 0, 255).astype(np.uint8)
     return Image.fromarray(image_blend)
 
-def visualize_items(items: dict, path: Path, model_id: str = None, face_labels: dict = None) -> None:
+def visualize_items(items: dict, path: Path, model_id: str = None, face_labels: dict = None, input_image_path: str = None) -> None:
     os.makedirs(path, exist_ok=True)
     view_name = items.get('view_names', ['custom'])[0]
-
-    samesh_dir = None
-    for base_path in [
-        os.path.abspath(os.path.join(os.path.dirname(path), '..')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')),
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ]:
-        if os.path.exists(os.path.join(base_path, 'assets')):
-            samesh_dir = base_path
-            break
-
-    pred_path = None
-    if model_id and samesh_dir:
-        gt_dir = os.path.join(samesh_dir, 'assets', f'{model_id}_gt')
-        if os.path.exists(gt_dir):
-            pred_file = f'{model_id}_pred.png'
-            pred_path = os.path.join(gt_dir, pred_file)
-
+    
+    # 获取输入图像路径
+    pred_path = input_image_path
+    
     faces = items['faces'][0]
     cmask = items['cmasks'][0]
     pose = items['poses'][0] if 'poses' in items and len(items['poses']) > 0 else None
     view_name_formatted = view_name.replace('-', '_')
-
+    
     plt.figure(figsize=(24, 16))
     plt.subplot(2, 4, 1)
     face_ids_img = np.array(colormap_faces(faces))
     plt.imshow(face_ids_img)
-    plt.title(f'Face IDs - {view_name}', pad=10, y=1.05)
+    title = f'Face IDs'
+    plt.title(title, pad=10, y=1.05)
     plt.axis('off')
-
+    
     plt.subplot(2, 4, 2)
     segmentation_mask_img = np.array(colormap_mask(cmask))
     plt.imshow(segmentation_mask_img)
-    plt.title(f'Segmentation Mask - {view_name}', pad=10, y=1.05)
+    title = f'Segmentation Mask'
+    plt.title(title, pad=10, y=1.05)
     plt.axis('off')
-
+    
     plt.subplot(2, 4, 3)
     norms = np.ones_like(faces, dtype=np.float32)[:, :, None].repeat(3, axis=2)
     visibility_mask = norms_mask(norms, pose, threshold=0.0) & (faces != -1)
     visible_faces_img = np.zeros((faces.shape[0], faces.shape[1], 3), dtype=np.uint8)
-    visible_faces_img[visibility_mask] = [0, 0, 255]
-    visible_faces_img[~visibility_mask] = [255, 255, 255]
+    visible_faces_img[visibility_mask] = [0, 0, 255]  
+    visible_faces_img[~visibility_mask] = [255, 255, 255]  
+    
     plt.imshow(visible_faces_img)
-    plt.title(f'Visible Faces - {view_name}', pad=10, y=1.05)
+    title = f'Visible Faces'
+    plt.title(title, pad=10, y=1.05)
     plt.axis('off')
-
+    
     plt.subplot(2, 4, 4)
     if pred_path and os.path.exists(pred_path):
         prediction_img = np.array(Image.open(pred_path))
         plt.imshow(prediction_img)
-        plt.title(f'Prediction - {view_name}', pad=10, y=1.05)
+        title = f'Input Image'
+        plt.title(title, pad=10, y=1.05)
     else:
-        plt.text(0.5, 0.5, 'Prediction Not Found',
+        plt.text(0.5, 0.5, 'Input Image Not Found', 
                  horizontalalignment='center', verticalalignment='center',
                  transform=plt.gca().transAxes)
-        plt.title(f'Prediction - {view_name}', pad=10, y=1.05)
+        title = f'Input Image'
+        plt.title(title, pad=10, y=1.05)
     plt.axis('off')
-
+    
     plt.subplot(2, 4, 5)
     final_selected_img = np.zeros((faces.shape[0], faces.shape[1], 3), dtype=np.uint8)
+    
     if face_labels is not None:
         for i in range(faces.shape[0]):
             for j in range(faces.shape[1]):
-                if faces[i, j] != -1:
+                if faces[i, j] != -1: 
                     face_id = int(faces[i, j])
                     if face_id in face_labels and face_labels[face_id] == 1:
-                        final_selected_img[i, j] = [0, 255, 0]
+                        final_selected_img[i, j] = [0, 255, 0]  
                     else:
-                        final_selected_img[i, j] = [255, 0, 0]
+                        final_selected_img[i, j] = [255, 0, 0]  
                 else:
-                    final_selected_img[i, j] = [255, 255, 255]
+                    final_selected_img[i, j] = [255, 255, 255]  
+        
         plt.imshow(final_selected_img)
-        plt.title(f'Actually Selected Faces - {view_name}', pad=10, y=1.05)
+        title = f'Selected Faces'
+        plt.title(title, pad=10, y=1.05)
     else:
-        plt.text(0.5, 0.5, 'Face labels not available',
-                 horizontalalignment='center', verticalalignment='center',
-                 transform=plt.gca().transAxes)
-        plt.title(f'Actually Selected Faces - {view_name}', pad=10, y=1.05)
+        plt.text(0.5, 0.5, 'Face labels not available', 
+                horizontalalignment='center', verticalalignment='center',
+                transform=plt.gca().transAxes)
+        title = f'Selected Faces'
+        plt.title(title, pad=10, y=1.05)
+    
+    plt.axis('off')
+    
+    plt.subplot(2, 4, 6)
+    blank_img = np.ones((faces.shape[0], faces.shape[1], 3), dtype=np.uint8) * 255
+    plt.imshow(blank_img)
+    plt.title(f'Reserved Space 2', pad=10, y=1.05)
+    plt.axis('off')
+    
+    plt.subplot(2, 4, 7)
+    plt.imshow(blank_img)
+    plt.title(f'Reserved Space 3', pad=10, y=1.05)
+    plt.axis('off')
+    
+    plt.subplot(2, 4, 8)
+    plt.imshow(blank_img)
+    plt.title(f'Reserved Space 4', pad=10, y=1.05)
     plt.axis('off')
 
-    blank_img = np.ones((faces.shape[0], faces.shape[1], 3), dtype=np.uint8) * 255
-    for col in range(6, 9):
-        plt.subplot(2, 4, col)
-        plt.imshow(blank_img)
-        plt.title(f'Reserved Space {col-4} - {view_name}', pad=10, y=1.05)
-        plt.axis('off')
-
     plt.tight_layout(pad=3.0, rect=[0, 0, 1, 0.95])
-    combined_path = f'{path}/combined_{view_name_formatted}.png'
+    combined_path = f'{path}/combined_visualization.png'
     plt.savefig(combined_path)
     plt.close()
+    
     print(f"Combined visualization saved to: {combined_path}")
 
 def norms_mask(norms: NumpyTensor['h w 3'], cam2world: NumpyTensor['4 4'], threshold=0.0) -> NumpyTensor['h w 3']:
@@ -468,7 +454,7 @@ class SegmentationModelMesh(nn.Module):
         renders = self.render(scene, visualize_path=None, view_name=view_name)
         face2label_consistent = self.lift(renders)
         if visualize_path is not None:
-            visualize_items(renders, visualize_path, self.model_id, face2label_consistent)
+            visualize_items(renders, visualize_path, self.model_id, face2label_consistent, self.current_predict_path)
         assert self.renderer.tmesh.faces.shape[0] == len(face2label_consistent)
         return face2label_consistent, self.renderer.tmesh
 
@@ -654,10 +640,11 @@ def segment_mesh(
     print(f"[segment_mesh] {filename}")
     filename = Path(filename)
     config   = copy.deepcopy(config)
+    # 不再使用filename.stem作为缓存路径
     if "cache" in config:
-        config.cache = Path(config.cache) / filename.stem
+        config.cache = Path(config.output) / "cache"
     model = SegmentationModelMesh(config)
-    model.model_id = filename.stem
+    model.model_id = filename.stem  # 仍需保留model_id以便内部逻辑工作
     model.current_predict_path = predict_image_path
 
     camera_info = read_camera_position(model.model_id, view_name=view_name)
@@ -667,27 +654,44 @@ def segment_mesh(
         tmesh = remove_texture(tmesh, visual_kind='vertex')
 
     model.set_camera_position(camera_info)
-    faces2label, _ = model(tmesh, visualize_path=None, view_name=view_name)
+    
+    # 创建输出目录
+    output_base = Path(config.output)
+    os.makedirs(output_base, exist_ok=True)
+    
+    # 设置可视化路径 - 直接使用输出目录
+    visualize_path = None
+    if visualize:
+        visualize_path = output_base  # 使用主输出目录
+        print(f"[Visualization] Will be saved to: {visualize_path}")
+    
+    faces2label, _ = model(tmesh, visualize_path=visualize_path, view_name=view_name)
 
     # 若完全检测不到 GT 面片：视为失败
     if not any(lbl == 1 for lbl in faces2label.values()):
         print("⚠  No GT faces → mark as failure")
         return None
-        
-    # 创建输出目录（修复）
-    output_base = Path(config.output) / filename.stem
-    os.makedirs(output_base.parent, exist_ok=True)
 
+    # 直接使用output_base作为输出路径，不创建子目录
     combined_mesh = create_combined_separated_mesh(tmesh, faces2label)
-    combined_mesh.export(f"{output_base}_combined_separated{filename.suffix}")
+    combined_mesh.export(f"{output_base}/combined_separated{filename.suffix}")
 
     gt_mesh = extract_gt_mesh(tmesh, faces2label)
-    gt_mesh.export(f"{output_base}_pred_area.obj")
+    gt_mesh.export(f"{output_base}/pred_area.obj")
 
-    with open(f"{output_base}_pred_face_ids.txt", "w") as f:
+    with open(f"{output_base}/pred_face_ids.txt", "w") as f:
         for fid, lbl in faces2label.items():
             if lbl == 1:
                 f.write(f"{fid}\n")
+                
+    # 如果启用了可视化，确保生成可视化结果
+    if visualize:
+        print(f"[Visualization] Generating visualization...")
+        # 重新渲染以获取渲染结果
+        renders = model.render(tmesh, visualize_path=None, view_name=view_name)
+        # 使用增强的visualize_items函数生成可视化
+        visualize_items(renders, visualize_path, model.model_id, faces2label, predict_image_path)
+        print(f"[Visualization] Complete!")
 
     return tmesh
 
@@ -706,6 +710,10 @@ def _process_all():
     base_cfg.sam_mesh.threshold_percentage      = 0.2
     # --------------------------------------------------------
 
+    # 确保输出目录存在
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    os.makedirs(FAILURE_DIR, exist_ok=True)
+
     # 修改匹配模式，查找所有PNG文件而不只是_predict.png结尾的文件
     pngs = sorted(glob.glob(os.path.join(PREDICT_DIR, "*.png")))
     print(f"[Batch] {len(pngs)} PNGs found")
@@ -720,23 +728,24 @@ def _process_all():
             print(f"❌ Mesh missing: {mesh_path}")
             continue
 
-        # 定义输出目录但不立即创建
+        # 定义输出目录并创建
         out_dir_name = f"{cls}_{mid}_segmentation_{view_raw}_joint_{joint_idx}"
         out_dir = Path(RESULT_DIR) / out_dir_name
+        os.makedirs(out_dir, exist_ok=True)
         
         cfg = copy.deepcopy(base_cfg)
-        cfg.output = str(out_dir)  # 仍设置输出路径
-        cfg.cache = str(out_dir / "cache")
+        cfg.output = str(out_dir)  # 设置输出路径
+        cfg.cache = str(out_dir / "cache")  # 使用cache子目录，而非基于模型ID
         
         print(f"[{idx}/{len(pngs)}] ID={mid} view={view_raw} joint={joint_idx}")
         try:
+            # 确保visualize参数为True
             ok = segment_mesh(mesh_path, cfg, png,
-                     visualize=False, texture=False, view_name=view_key)
+                     visualize=True, texture=False, view_name=view_key)
             if ok is None:
                 raise RuntimeError("no_GT")
                 
-            # 只有成功时才创建目录并复制文件
-            out_dir.mkdir(parents=True, exist_ok=True)
+            # 复制输入的预测图片到结果目录
             try:
                 shutil.copy2(png, out_dir / Path(png).name)
             except Exception as e:
@@ -748,7 +757,6 @@ def _process_all():
             import traceback; traceback.print_exc()
             
             # 失败的情况只复制到failure目录
-            os.makedirs(FAILURE_DIR, exist_ok=True)
             try:
                 shutil.copy2(png, os.path.join(FAILURE_DIR, Path(png).name))
             except Exception as ee:
