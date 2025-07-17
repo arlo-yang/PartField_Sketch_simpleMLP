@@ -33,6 +33,35 @@ from samesh.utils.cameras import *
 from samesh.utils.mesh import duplicate_verts
 import math
 
+# ------------------------------------------------------------------------------
+#                                固定路径配置
+# ------------------------------------------------------------------------------
+PREDICT_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/img"
+URDF_DIR    = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf"
+RESULT_DIR  = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/result"
+FAILURE_DIR = os.path.join(RESULT_DIR, "failure")
+CONFIG_FILE = Path("/hy-tmp/PartField_Sketch_simpleMLP/samesh/configs/mesh_segmentation.yaml")
+
+# ------------------------------------------------------------------------------
+#                       预测文件名解析正则 + 工具函数
+# ------------------------------------------------------------------------------
+_PREDICT_RE = re.compile(
+    r"""^(?P<class>.+?)_(?P<id>\d+)_segmentation_(?P<view>.+?)_joint_(?P<joint>\d+)\.png$""",
+    re.IGNORECASE
+)
+
+def parse_predict_filename(fname: str):
+    """返回 (class, id, view, joint:int)"""
+    m = _PREDICT_RE.match(os.path.basename(fname))
+    if not m:
+        raise ValueError(f"Invalid predict filename: {fname}")
+    return (
+        m.group("class"),
+        m.group("id"),
+        m.group("view"),
+        int(m.group("joint"))
+    )
+
 # 定义标准视角位置
 distance = 2.5
 VIEW_POSITIONS = {
@@ -105,28 +134,32 @@ VIEW_POSITIONS = {
 } 
 
 # 创建组合可视化，将每个视角的face id、分割结果、预测图和可见面片显示在同一张图上
-def visualize_items(items: dict, path: Path, model_id: str = None, face_labels: dict = None) -> None:
+def visualize_items(items: dict, path: Path, model_id: str = None, face_labels: dict = None, input_image_path: str = None) -> None:
     os.makedirs(path, exist_ok=True)
     subplots_dir = os.path.join(path, "subplots")
     os.makedirs(subplots_dir, exist_ok=True)
     view_name = items.get('view_names', ['custom'])[0]
     
-    samesh_dir = None
-    for base_path in [
-        os.path.abspath(os.path.join(os.path.dirname(path), '..')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '..')
-    ]:
-        if os.path.exists(os.path.join(base_path, 'assert')):
-            samesh_dir = base_path
-            break
+    # 优先使用提供的输入图像路径
+    pred_path = input_image_path
     
-    pred_path = None
-    if model_id and samesh_dir:
-        gt_dir = os.path.join(samesh_dir, 'assert', f'{model_id}_gt')
-        if os.path.exists(gt_dir):
-            pred_file = f'{model_id}_pred.png'
-            pred_path = os.path.join(gt_dir, pred_file)
+    # 如果没有提供输入图像或路径不存在，尝试从assert目录获取
+    if not pred_path or not os.path.exists(pred_path):
+        samesh_dir = None
+        for base_path in [
+            os.path.abspath(os.path.join(os.path.dirname(path), '..')),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '..')
+        ]:
+            if os.path.exists(os.path.join(base_path, 'assert')):
+                samesh_dir = base_path
+                break
+        
+        if model_id and samesh_dir:
+            gt_dir = os.path.join(samesh_dir, 'assert', f'{model_id}_gt')
+            if os.path.exists(gt_dir):
+                pred_file = f'{model_id}_pred.png'
+                pred_path = os.path.join(gt_dir, pred_file)
     
     faces = items['faces'][0]
     cmask = items['cmasks'][0]
@@ -401,6 +434,8 @@ class SegmentationModelMesh(nn.Module):
         # 添加自定义相机位置属性
         self.custom_camera = None
         
+        # 添加预测图像路径属性
+        self.current_predict_path = None
     
     # 设置自定义相机位置，用于渲染
     def set_camera_position(self, camera_info):
@@ -603,7 +638,7 @@ class SegmentationModelMesh(nn.Module):
         face2label_consistent = self.lift(renders)
         
         if visualize_path is not None:
-            visualize_items(renders, visualize_path, self.model_id, face2label_consistent)
+            visualize_items(renders, visualize_path, self.model_id, face2label_consistent, self.current_predict_path if hasattr(self, 'current_predict_path') else None)
         
         assert self.renderer.tmesh.faces.shape[0] == len(face2label_consistent)
         return face2label_consistent, self.renderer.tmesh
@@ -633,7 +668,17 @@ class SegmentationModelMesh(nn.Module):
         return components
 
     def call_segmentation(self, image: Image, mask: NumpyTensor['h w'], view_index=None):
-        """Load ground truth mask"""
+        """Load ground truth mask or use provided prediction image"""
+        # 如果有当前预测路径，优先使用它
+        if hasattr(self, 'current_predict_path') and self.current_predict_path and os.path.exists(self.current_predict_path):
+            print(f"使用预测图像: {self.current_predict_path}")
+            gt_img = Image.open(self.current_predict_path).convert('L')
+            gt_array = np.array(gt_img)
+            fg_mask = (gt_array > 127)
+            bg_mask = (gt_array <= 127)
+            return np.array([fg_mask, bg_mask], dtype=bool)
+            
+        # 以下为原有代码，在没有预测图像时使用
         if not self.model_id:
             raise ValueError("model_id not set")
         
@@ -1304,13 +1349,14 @@ def extract_non_gt_mesh(tmesh: Trimesh, face2label: dict[int, int]) -> Trimesh:
     return non_gt_mesh
 
 # 修改segment_mesh函数，增加导出单独部分的功能
-def segment_mesh(filename: Path | str, config: OmegaConf, visualize=False, extension='glb', target_labels=None, texture=False, view_name=None) -> Trimesh:
+def segment_mesh(filename: Path | str, config: OmegaConf, predict_image_path: str = None, visualize=False, extension='glb', target_labels=None, texture=False, view_name=None) -> Trimesh:
     """
     Segment 3D mesh and save results
     
     Args:
         filename: Model file path
         config: Configuration object
+        predict_image_path: Path to prediction image for segmentation
         visualize: Whether to generate visualization results
         extension: Export file extension
         target_labels: Target label count for post-processing (不再使用)
@@ -1320,11 +1366,7 @@ def segment_mesh(filename: Path | str, config: OmegaConf, visualize=False, exten
     Returns:
         Mesh object with color labels
     """
-    print(f"\n[PATH DEBUG] ===== Starting segment_mesh =====")
-    print(f"[PATH DEBUG] Current working directory: {os.getcwd()}")
-    print(f"[PATH DEBUG] Model file: {filename}")
-    
-    print('Segmenting mesh with segmentation model: ', filename)
+    print(f'Segmenting mesh with segmentation model: ', filename)
     
     # 确保使用的是Path对象
     if isinstance(filename, str):
@@ -1353,6 +1395,11 @@ def segment_mesh(filename: Path | str, config: OmegaConf, visualize=False, exten
     # 设置模型ID
     model.model_id = filename.stem
     print(f"Model ID: {model.model_id}")
+
+    # 设置预测图像路径
+    if predict_image_path and hasattr(model, 'current_predict_path'):
+        model.current_predict_path = predict_image_path
+        print(f"设置预测图像路径: {predict_image_path}")
     
     # 获取相机信息
     try:
@@ -1520,38 +1567,90 @@ def split_mesh_by_labels_with_hole(mesh: Trimesh, face2label: dict[int, int]) ->
     return gt_mesh, non_gt_mesh
 
 
+# ------------------------------------------------------------------------------
+#                             批量驱动函数
+# ------------------------------------------------------------------------------
+def _process_all():
+    if not Path(CONFIG_FILE).exists():
+        raise FileNotFoundError(f"Config not found: {CONFIG_FILE}")
+    base_cfg: OmegaConf = OmegaConf.load(CONFIG_FILE)
+
+    # 确保输出目录存在
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    os.makedirs(FAILURE_DIR, exist_ok=True)
+
+    # 修改匹配模式，查找所有PNG文件
+    pngs = sorted(glob.glob(os.path.join(PREDICT_DIR, "*.png")))
+    print(f"[Batch] {len(pngs)} PNGs found")
+
+    for idx, png in enumerate(pngs, 1):
+        cls, mid, view_raw, joint_idx = parse_predict_filename(png)
+        view_key = view_raw.replace("_", "-")
+        
+        # 修改几何体路径格式
+        mesh_path = Path(URDF_DIR) / mid / "yy_merged.obj"
+        if not mesh_path.exists():
+            print(f"❌ Mesh missing: {mesh_path}")
+            continue
+
+        # 定义输出目录并创建
+        out_dir_name = f"{cls}_{mid}_segmentation_{view_raw}_joint_{joint_idx}"
+        out_dir = Path(RESULT_DIR) / out_dir_name
+        os.makedirs(out_dir, exist_ok=True)
+        
+        cfg = copy.deepcopy(base_cfg)
+        cfg.output = str(out_dir)  # 设置输出路径
+        cfg.cache = str(out_dir / "cache")  # 使用cache子目录
+        
+        print(f"[{idx}/{len(pngs)}] ID={mid} view={view_raw} joint={joint_idx}")
+        try:
+            segment_mesh(mesh_path, cfg, predict_image_path=png,
+                     visualize=True, texture=False, view_name=view_key)
+                
+            # 复制输入的预测图片到结果目录
+            try:
+                shutil.copy2(png, out_dir / Path(png).name)
+            except Exception as e:
+                print(f"   ⚠ copy PNG failed: {e}")
+            print(f"   ✓ saved → {out_dir}")
+            
+        except Exception as e:
+            print(f"   ✖ {e}")
+            import traceback; traceback.print_exc()
+            
+            # 失败的情况只复制到failure目录
+            try:
+                shutil.copy2(png, os.path.join(FAILURE_DIR, Path(png).name))
+            except Exception as ee:
+                print(f"   ⚠ copy to failure failed: {ee}")
+            continue
+
+
 if __name__ == '__main__':
-    import glob
     import argparse
-    from natsort import natsorted
-
-
-    def read_filenames(pattern: str):
-        """
-        读取匹配模式的文件名列表
-        """
-        print(f"[PATH DEBUG] Reading filenames with pattern: {pattern}")
-        filenames = glob.glob(pattern)
-        filenames = map(Path, filenames)
-        filenames = natsorted(list(set(filenames)))
-        print(f'[PATH DEBUG] Found {len(filenames)} files matching pattern')
-        for i, f in enumerate(filenames):
-            print(f"  {i+1}. {f}")
-        return filenames
     
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='3D网格分割工具')
+    parser.add_argument('--process_all', action='store_true', default=False,
+                       help='执行批量处理模式')
     parser.add_argument('--config', type=str, 
-                        default='configs/mesh_segmentation.yaml',
-                        help='配置文件路径')
+                       default='configs/mesh_segmentation.yaml',
+                       help='配置文件路径')
     parser.add_argument('--model', type=str, default=None,
-                        help='指定要处理的单个模型文件名（位于assets目录下），如果不指定则处理所有模型')
+                       help='指定要处理的单个模型文件名')
     parser.add_argument('--view', type=str, default=None,
-                        help='指定单一视角名称，例如 "center", "left", "right" 等，默认使用所有视角')
+                       help='指定单一视角名称')
     parser.add_argument('--visualize', action='store_true', default=True,
-                        help='是否生成可视化结果')
+                       help='是否生成可视化结果')
     
     args = parser.parse_args()
+    
+    # 如果指定了批处理模式，执行批处理
+    if args.process_all:
+        _process_all()
+        exit(0)
+        
+    # 以下为原有的单文件处理模式
     print(f"[PATH DEBUG] Command line arguments: {args}")
     
     # 设置文件路径 - 使用相对路径
