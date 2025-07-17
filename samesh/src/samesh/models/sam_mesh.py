@@ -11,7 +11,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import trimesh
-# import igraph
 from PIL import Image
 from omegaconf import OmegaConf
 from trimesh.base import Trimesh, Scene
@@ -19,8 +18,6 @@ from tqdm import tqdm
 from natsort import natsorted
 
 import matplotlib.pyplot as plt
-# from matplotlib.patches import FancyArrowPatch
-# from mpl_toolkits.mplot3d import Axes3D, proj3d
 import glob
 import re
 from datetime import datetime

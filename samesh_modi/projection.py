@@ -688,11 +688,6 @@ def segment_mesh(
     
     faces2label, _ = model(tmesh, visualize_path=visualize_path, view_name=view_name)
 
-    # 若完全检测不到 GT 面片：视为失败
-    if not any(lbl == 1 for lbl in faces2label.values()):
-        print("⚠  No GT faces → mark as failure")
-        return None
-
     # 直接使用output_base作为输出路径，不创建子目录
     combined_mesh = create_combined_separated_mesh(tmesh, faces2label)
     combined_mesh.export(f"{output_base}/combined_separated{filename.suffix}")
@@ -724,13 +719,6 @@ def _process_all():
         raise FileNotFoundError(f"Config not found: {CONFIG_FILE}")
     base_cfg: OmegaConf = OmegaConf.load(CONFIG_FILE)
 
-    # ------------------- 强制写入阈值：0.2 % -------------------
-    if "sam_mesh" not in base_cfg:
-        base_cfg.sam_mesh = OmegaConf.create()
-    base_cfg.sam_mesh.use_percentage_threshold = True
-    base_cfg.sam_mesh.threshold_percentage      = 0.2
-    # --------------------------------------------------------
-
     # 确保输出目录存在
     os.makedirs(RESULT_DIR, exist_ok=True)
     os.makedirs(FAILURE_DIR, exist_ok=True)
@@ -760,11 +748,9 @@ def _process_all():
         
         print(f"[{idx}/{len(pngs)}] ID={mid} view={view_raw} joint={joint_idx}")
         try:
-            # 确保visualize参数为True
-            ok = segment_mesh(mesh_path, cfg, png,
+            # 执行分割
+            segment_mesh(mesh_path, cfg, png,
                      visualize=True, texture=False, view_name=view_key)
-            if ok is None:
-                raise RuntimeError("no_GT")
                 
             # 复制输入的预测图片到结果目录
             try:
