@@ -62,13 +62,13 @@ class CustomWholeObjDataset(Demo_Dataset):
         vertices = mesh.vertices
         faces = mesh.faces
         
-        # 标准化网格
-        bbmin = vertices.min(0)
-        bbmax = vertices.max(0)
-        center = (bbmin + bbmax) * 0.5
-        scale = 2.0 * 0.9 / (bbmax - bbmin).max()
-        vertices = (vertices - center) * scale
-        mesh.vertices = vertices
+        # 标准化网格 - 已注释掉以保持模型原始大小
+        # bbmin = vertices.min(0)
+        # bbmax = vertices.max(0)
+        # center = (bbmin + bbmax) * 0.5
+        # scale = 2.0 * 0.9 / (bbmax - bbmin).max()
+        # vertices = (vertices - center) * scale
+        # mesh.vertices = vertices
         
         # 确保是三角形网格
         from partfield.dataloader import quad_to_triangle_mesh
