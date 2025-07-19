@@ -48,4 +48,4 @@ ENV/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo javascript/node_modules/
