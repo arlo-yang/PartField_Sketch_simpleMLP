@@ -1,6 +1,7 @@
 # 数据目录
 
 javascript/urdf/*
+javascript/node_modules/*
 partfield/model/*
 data/img/*
 data/urdf/*
