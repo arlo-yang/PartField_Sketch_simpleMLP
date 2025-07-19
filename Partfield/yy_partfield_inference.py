@@ -31,7 +31,7 @@ class CustomWholeObjDataset(Demo_Dataset):
         torch.utils.data.Dataset.__init__(self)
         
         # 确保使用正确的数据路径
-        self.data_path = "/hy-tmp/PartField_Sketch_simpleMLP/data/urdf"  # 直接硬编码URDF路径
+        self.data_path = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf"  # 直接硬编码URDF路径
         print(f"使用数据路径: {self.data_path}")
         
         self.is_pc = False  # 我们处理的是网格数据
@@ -89,6 +89,58 @@ class CustomWholeObjDataset(Demo_Dataset):
         import gc
         gc.collect()
         return self.get_model(self.data_list[index])
+
+def compare_mesh_faces(original_mesh, generated_mesh, output_path):
+    """
+    比较两个网格的面片顺序并保存结果
+    
+    参数:
+        original_mesh: 原始网格对象
+        generated_mesh: 生成的网格对象
+        output_path: 输出结果的路径
+    """
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # 比较面片数量
+    orig_faces = len(original_mesh.faces)
+    gen_faces = len(generated_mesh.faces)
+    
+    with open(output_path, 'w') as f:
+        f.write(f"面片数量比较:\n")
+        f.write(f"- 原始网格: {orig_faces} 面片\n")
+        f.write(f"- 生成网格: {gen_faces} 面片\n\n")
+        
+        if orig_faces != gen_faces:
+            f.write(f"警告: 面片数量不一致!\n\n")
+        
+        # 比较前10个面片的顶点索引
+        f.write(f"前10个面片的顶点索引比较:\n")
+        f.write("面片ID | 原始网格 | 生成网格\n")
+        f.write("-------|----------|----------\n")
+        
+        for i in range(min(10, orig_faces, gen_faces)):
+            orig_face = original_mesh.faces[i].tolist()
+            gen_face = generated_mesh.faces[i].tolist() if i < gen_faces else ["N/A"]
+            f.write(f"{i} | {orig_face} | {gen_face}\n")
+        
+        # 检查几何一致性
+        f.write("\n几何一致性检查 (前10个面片):\n")
+        f.write("面片ID | 原始网格面中心 | 生成网格面中心 | 距离\n")
+        f.write("-------|----------------|----------------|------\n")
+        
+        for i in range(min(10, orig_faces, gen_faces)):
+            if i < orig_faces and i < gen_faces:
+                # 计算面片中心点
+                orig_center = np.mean([original_mesh.vertices[v] for v in original_mesh.faces[i]], axis=0)
+                gen_center = np.mean([generated_mesh.vertices[v] for v in generated_mesh.faces[i]], axis=0)
+                
+                # 计算中心点距离
+                distance = np.linalg.norm(orig_center - gen_center)
+                
+                f.write(f"{i} | {orig_center.tolist()} | {gen_center.tolist()} | {distance:.6f}\n")
+    
+    print(f"面片比较结果已保存到: {output_path}")
 
 def predict(cfg):
     """
@@ -151,7 +203,7 @@ def predict(cfg):
             model_id = batch['uid'][0]
             
             # 创建输出目录
-            output_dir = os.path.join("/hy-tmp/PartField_Sketch_simpleMLP/data/urdf", model_id, "feature")
+            output_dir = os.path.join("/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature")
             os.makedirs(output_dir, exist_ok=True)
             
             # 检查是否已经处理过
@@ -237,6 +289,14 @@ def predict(cfg):
                 # 合并所有批次的结果
                 return torch.cat(all_sample, dim=1)
             
+            # 保存原始网格信息，用于后续比较
+            original_mesh_path = os.path.join("/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "yy_merged.obj")
+            from partfield.utils import load_mesh_util
+            original_mesh = load_mesh_util(original_mesh_path)
+            # 确保是三角形网格
+            from partfield.dataloader import quad_to_triangle_mesh
+            original_mesh.faces = quad_to_triangle_mesh(original_mesh.faces)
+            
             # 处理面特征
             n_point_per_face = self.cfg.n_point_per_face if hasattr(self.cfg, 'n_point_per_face') else 10
             
@@ -272,8 +332,14 @@ def predict(cfg):
             colored_mesh = trimesh.Trimesh(vertices=V, faces=F, face_colors=colors_255, process=False)
             
             # 导出彩色网格
-            colored_mesh.export(os.path.join(output_dir, f"{model_id}.ply"))
-            print(f"保存可视化到 {output_dir}/{model_id}.ply")
+            ply_path = os.path.join(output_dir, f"{model_id}.ply")
+            colored_mesh.export(ply_path)
+            print(f"保存可视化到 {ply_path}")
+            
+            # 比较原始网格和生成的PLY网格的面片顺序
+            generated_mesh = trimesh.load(ply_path, force='mesh', process=False)
+            comparison_path = os.path.join(output_dir, f"{model_id}_face_comparison.txt")
+            compare_mesh_faces(original_mesh, generated_mesh, comparison_path)
             
             # 清理GPU内存
             torch.cuda.empty_cache()
