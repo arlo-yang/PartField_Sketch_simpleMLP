@@ -5,7 +5,9 @@ partfield/model/*
 data/img/*
 data/urdf/*
 PartField_Sketch_simpleMLP/data_small/*
-data_small/*
+data_small/img/*
+data_small/urdf/*
+data_small/result/*
 z_face_average/greenred/*
 
 # demo 生成的输出
