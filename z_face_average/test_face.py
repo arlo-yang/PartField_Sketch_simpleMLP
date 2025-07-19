@@ -99,30 +99,30 @@ def process_model(model_id, joint_id=None):
         try:
             # 加载三种网格
             print(f"加载原始OBJ文件...")
-            original_mesh = trimesh.load(obj_path, force='mesh')
+    original_mesh = trimesh.load(obj_path, force='mesh')
             print(f"- 原始网格面片数量: {len(original_mesh.faces)}")
-            
+    
             print(f"加载特征PLY文件...")
-            feature_mesh = trimesh.load(ply_path, force='mesh')
+    feature_mesh = trimesh.load(ply_path, force='mesh')
             print(f"- 特征网格面片数量: {len(feature_mesh.faces)}")
-            
+    
             print(f"加载可动部件PLY文件...")
             moveable_mesh = trimesh.load(moveable_path, force='mesh')
             print(f"- 可动部件网格面片数量: {len(moveable_mesh.faces)}")
-            
+    
             # 检查面片数量是否一致
             if len(original_mesh.faces) != len(feature_mesh.faces) or len(original_mesh.faces) != len(moveable_mesh.faces):
                 print(f"警告：三个网格的面片数量不一致！")
                 print(f"- 原始网格: {len(original_mesh.faces)} 面片")
                 print(f"- 特征网格: {len(feature_mesh.faces)} 面片")
                 print(f"- 可动部件网格: {len(moveable_mesh.faces)} 面片")
-            
+    
             # 创建面片ID颜色可视化
             print("创建面片ID颜色可视化...")
             id_colored_original = create_id_colored_mesh(original_mesh, "original")
             id_colored_feature = create_id_colored_mesh(feature_mesh, "feature")
             id_colored_moveable = create_id_colored_mesh(moveable_mesh, "moveable")
-            
+    
             # 保存ID颜色可视化网格
             original_output_path = os.path.join(output_path, f"{model_id}_original_id_colored.ply")
             feature_output_path = os.path.join(output_path, f"{model_id}_feature_id_colored.ply")

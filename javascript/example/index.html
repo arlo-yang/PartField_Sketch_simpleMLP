@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+        <meta charset="utf-8"/>
+
+        <title>URDF Viewer Example</title>
+
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎃</text></svg>">
+        
+        <script src="https://unpkg.com/@webcomponents/webcomponentsjs@2.4.3/webcomponents-bundle.js"></script>
+        <link href="https://fonts.googleapis.com/css?family=Roboto:100,300" rel="stylesheet"/>
+        <link href="./styles.css" type="text/css" rel="stylesheet" />
+        <script src="./src/redirect.js"></script>
+        <script src="https://unpkg.com/three@0.150.0/examples/js/loaders/PLYLoader.js"></script>
+        <script src="https://unpkg.com/urdf-loader@0.10.4/umd/urdf-loader.min.js"></script>
+        <style>
+            body {
+                background-color: #263238 !important;
+            }
+        </style>
+    </head>
+    <body tabindex="0">
+
+        <div id="menu">
+            <div id="urdf-categories">
+                <!-- 分类和模型会通过 JavaScript 动态添加 -->
+            </div>
+
+            <div id="controls" class="hidden">
+                <div id="toggle-controls"></div>
+                
+                <!-- Axis Control -->
+                <div class="default-container">
+                    <div id="axes-toggle" class="toggle">Show Axes</div>
+                </div>
+                
+                <!-- View Control -->
+                <div class="default-container">
+                    <div id="view-toggle" class="toggle">View</div>
+                    <select id="view-select" class="state-select">
+                        <!-- 左侧视角 -->
+                        <option value="top-left">Top Left</option>
+                        <option value="left">Left</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        
+                        <!-- 中间视角 -->
+                        <option value="top-center">Top Center</option>
+                        <option value="center">Center</option>
+                        <option value="bottom-center">Bottom Center</option>
+                        
+                        <!-- 右侧视角 -->
+                        <option value="top-right">Top Right</option>
+                        <option value="right">Right</option>
+                        <option value="bottom-right">Bottom Right</option>
+                    </select>
+                </div>
+                
+                <!-- Screenshot Control -->
+                <div class="default-container">
+                    <div id="screenshot-toggle" class="toggle">Take Screenshot</div>
+                </div>
+
+                <!-- Add the gallery control -->
+                <div class="default-container">
+                    <div id="gallery-toggle" class="toggle">Object Gallery</div>
+                </div>
+                
+                <!-- Separator Line -->
+                <div class="separator-line"></div>
+                
+                <!-- Render Controls -->
+                <div class="default-container">
+                    <div id="default-render" class="toggle checked">Default</div>
+                    <select id="default-state" class="state-select">
+                        <option value="close">Close</option>
+                        <option value="open">Open</option>
+                    </select>
+                </div>
+
+                <div class="default-container">
+                    <div id="normal-render" class="toggle">Normal Map</div>
+                    <select id="normal-state" class="state-select">
+                        <option value="close">Close</option>
+                        <option value="open">Open</option>
+                    </select>
+                </div>
+
+                <div class="default-container">
+                    <div id="depth-render" class="toggle">Depth Map</div>
+                    <select id="depth-state" class="state-select">
+                        <option value="close">Close</option>
+                        <option value="open">Open</option>
+                    </select>
+                </div>
+
+                <div class="default-container">
+                    <div id="wireframe-render" class="toggle">Wireframe</div>
+                    <select id="wireframe-state" class="state-select">
+                        <option value="close">Close</option>
+                        <option value="open">Open</option>
+                    </select>
+                </div>
+
+                <div class="default-container">
+                    <div id="segmentation-render" class="toggle">Segmentation</div>
+                    <select id="segmentation-joint-select" class="state-select">
+                        <option value="unselect">non-slect</option>
+                        <!-- Joint options will be dynamically added here -->
+                    </select>
+                </div>
+
+
+
+
+
+                <div class="separator-line"></div>
+                <div class="default-container">
+                    <div id="arrow-default" class="toggle">Arrow (Default)</div>
+                    <select id="arrow-default-style" class="state-select">
+                        <option value="0">joint_0</option>
+                    </select>
+                </div>
+                <!-- 添加隐藏的arrow-point元素，用于修复UI问题 -->
+                <div class="default-container" style="display:none;">
+                    <div id="arrow-point" class="toggle">Arrow (Point)</div>
+                    <select id="arrow-point-style" class="state-select">
+                        <option value="0">joint_0</option>
+                    </select>
+                </div>
+                <div class="default-container">
+                    <div id="arrow-sketch" class="toggle">Arrow (Sketch)</div>
+                    <select id="arrow-sketch-style" class="state-select">
+                        <option value="0">joint_0</option>
+                    </select>
+                </div>
+                <div class="default-container">
+                    <div id="arrow-wireframe" class="toggle">Arrow (Wireframe)</div>
+                    <select id="arrow-wireframe-style" class="state-select">
+                        <option value="0">joint_0</option>
+                    </select>
+                </div>
+                <div class="container">
+                </div>
+                <ul></ul>
+            </div>
+        </div>
+        <urdf-viewer up="-Z" display-shadow tabindex="0"></urdf-viewer>
+
+        <!-- URDF信息面板 -->
+        <div id="urdf-info-panel" class="urdf-info-panel">
+            <div class="urdf-info-header">
+                Joint Information
+                <span id="urdf-toggle" class="info-toggle">▼</span>
+            </div>
+            <div id="urdf-info-content" class="urdf-info-content">
+                <div class="urdf-controls">
+                    <div class="info-item">
+                        <span class="info-label">Joint Actions:</span>
+                        <button id="load-urdf-content" class="action-btn">Enable Joint Interaction</button>
+                    </div>
+                </div>
+                <div class="urdf-viewer-container">
+                    <div id="joint-info-display" class="joint-info-display">
+                        <div class="joint-info-placeholder">
+                            Hover over model parts to see joint information
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="./src/index.js"></script>
+        <script>
+          window.addEventListener('load', async () => {
+            const testImage = new Image();
+            
+            // 确保背景色正确设置
+            document.body.style.backgroundColor = '#263238';
+            
+            // 每隔一秒检查一次背景色，确保不会变成白色
+            const bgInterval = setInterval(() => {
+              const bgColor = document.body.style.backgroundColor;
+              if (bgColor === 'white' || bgColor === '#ffffff' || bgColor === 'rgb(255, 255, 255)') {
+                console.log('检测到白色背景，重置为深色');
+                document.body.style.backgroundColor = '#263238';
+              }
+            }, 1000);
+            
+            // 30秒后停止检查
+            setTimeout(() => clearInterval(bgInterval), 30000);
+            
+            // 添加调试代码，检查页面上是否存在arrow-point元素
+            console.log('DEBUG: arrow-point元素存在状态:', !!document.getElementById('arrow-point'));
+            console.log('DEBUG: arrow-point-style元素存在状态:', !!document.getElementById('arrow-point-style'));
+            
+            // 监听页面错误
+            window.addEventListener('error', (event) => {
+              console.error('捕获到JS错误:', event.error);
+            });
+          });
+        </script>
+    </body>
+</html>

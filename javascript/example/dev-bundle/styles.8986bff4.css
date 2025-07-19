@@ -1,0 +1,900 @@
+/* 1. 全局盒模型，防止任何元素因 padding/border 撑宽 */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* 2. 禁止容器出现水平滚动条 */
+.container {
+    overflow-x: hidden;
+}
+
+html, body, urdf-viewer {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: "Roboto", helvetica, arial, sans-serif;
+    animation: fade 3s ease;
+    color: white;
+    user-select: none;
+    background-color: #263238 !important; /* 强制设置背景色 */
+}
+
+select {
+    font-family: "Roboto", helvetica, arial, sans-serif;
+    background: rgba(255,255,255,0.25);
+    border: none;
+    color: white;
+    font-size: 16px;
+    font-weight: 300;
+    outline: none;
+    float: right;
+}
+
+option {
+    color: #888;
+}
+
+input[type="number"] {
+    color: white;
+    border: none;
+    font-weight: 300;
+    background: rgba(255,255,255,0.25);
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* 3. 修复滑块撑宽问题 —— 关键加入 flex 与 min-width */
+input[type=range] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    -ms-appearance: none;
+    appearance: none;
+    border: none;
+    outline: none;
+    flex: 1 1 auto;   /* 允许按需收缩 */
+    min-width: 0;     /* 防止在 flex 布局下溢出 */
+    width: 100%;
+    height: 16px;
+    background-color: transparent;
+    margin: 0 10px;   /* 若想减小可调成 0 5px 或 0 */
+}
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 1px;
+    background: white;
+    border-radius: 5px;
+    border: 1px solid white;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    border: none;
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    background: white;
+    margin-top: -5px;
+}
+input[type=range]:focus {
+    outline: none;
+}
+input[type=range]:focus::-webkit-slider-runnable-track {
+    background: white;
+}
+
+input[type=range]::-moz-range-track {
+    width: 100%;
+    height: 1px;
+    background: white;
+    border: none;
+    border-radius: 5px;
+}
+input[type=range]::-moz-range-thumb {
+    border: none;
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    background: white;
+}
+
+input[type=range]:-moz-focusring{
+    outline: 1px solid white;
+    outline-offset: -1px;
+}
+
+input[type=range]::-ms-track {
+    width: 100%;
+    height: 1px;
+    background: white;
+    border-radius: 10px;
+    color: transparent;
+    border: none;
+    outline: none;
+}
+input[type=range]::-ms-thumb {
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    outline: none;
+    margin-top: 2px;
+}
+
+input:focus {
+    outline: none;
+    opacity: 1;
+}
+
+#up-select {
+    width: 70px;
+    margin: 0 20px;
+}
+
+#menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 40px);
+    margin: 20px 20px 20px 0;
+    overflow-y: auto;
+    padding-right: 20px;
+    padding-left: 20px;
+}
+
+#menu::-webkit-scrollbar {
+    width: 8px;
+    position: absolute;
+    left: 0;
+}
+
+#menu::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+#menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+#menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+#urdf-options {
+    text-overflow: ellipsis;
+}
+
+#urdf-options li {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 20px;
+    font-weight: 100;
+}
+
+#urdf-options li:hover {
+    opacity: 0.75;
+}
+
+/* 原本 overflow 已经隐藏，但若其它脚本改写，也能避免 */
+#controls {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 15px 0;
+    transition: 0.5s opacity ease;
+    overflow: hidden;     /* y 已隐藏，x 仍然 hidden 防止水平条 */
+}
+
+#controls > * {
+    margin: 5px 0;
+}
+
+#controls #toggle-controls {
+    margin-top: 0;
+    margin-bottom: 10px;
+    text-align: right;
+    transition: 0.1s opacity linear;
+    border-top: 1px solid white;
+}
+
+#controls #toggle-controls:hover {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#controls #toggle-controls:before {
+    content: "hide controls";
+    font-size: 12px;
+    font-weight: normal;
+}
+
+/* hidden state */
+#controls.hidden #toggle-controls:before {
+    content: "show controls";
+}
+
+#controls.hidden > *:not(#toggle-controls) {
+    display: none;
+}
+
+#controls.hidden #toggle-controls {
+    opacity: 0.5;
+}
+
+/* list of joint sliders */
+#controls ul {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#controls.hide-fixed li[joint-type="fixed"]{
+    display: none;
+}
+
+#controls li {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    padding: 1px 0;
+    width: 100%;
+    user-select: text;
+    transition: background 0.25s ease;
+}
+
+#controls li[robot-hovered] {
+    background: rgba(255,255,255,0.35);
+}
+
+#controls li span {
+    padding: 0 5px;
+    max-width: 175px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    user-select: none;
+}
+
+#controls li input[type="number"] {
+    width: 50px;
+    overflow: hidden;
+}
+
+@keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 700px) {
+    #controls {
+        display: none;
+    }
+}
+
+#urdf-categories {
+    color: white;
+    margin: 0;
+    user-select: none;
+    width: 100%;
+    max-height: 40vh; /* 将最大高度缩小一半 */
+    overflow-y: auto; /* 添加垂直滚动条 */
+    overflow-x: hidden; /* 禁用水平滚动条 */
+    padding-right: 16px; /* 添加右侧padding，让滚动条位置稍微右移 */
+}
+
+.category-header {
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.category-header:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.category-content {
+    margin-left: 20px;
+    display: none;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden; /* 添加此属性，禁止水平滚动条 */
+    padding-right: 10px;
+}
+
+.category-content.expanded {
+    display: block;
+}
+
+.model-item {
+    padding: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.model-item:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* 选中的模型项样式 */
+.model-item.selected {
+    font-weight: bold;
+    background: rgba(255,255,255,0.15);
+    border-left: 3px solid rgba(255,255,255,0.6);
+    padding-left: 2px; /* 补偿边框宽度 */
+}
+
+.arrow {
+    display: inline-block;
+    margin-right: 5px;
+    transition: transform 0.2s;
+}
+
+.expanded .arrow {
+    transform: rotate(90deg);
+}
+
+/* toggle controls */
+.toggle {
+    padding-left: 25px;
+    position: relative;
+    cursor: pointer;
+}
+
+.toggle:before {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 15px;
+    height: 15px;
+    border-radius: 10px;
+    border: 2px solid white;
+    margin-right: 5px;
+}
+
+.toggle:after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    position: absolute;
+    left: 3px;  /* 从5px改为3px，使其水平居中 */
+    top: 3px;   /* 从5px改为3px，使其垂直居中 */
+    background: white;
+    border-radius: 10px;
+    opacity: 0;
+}
+
+.toggle:not(.checked):hover:after {
+    opacity: 0.25;
+}
+
+.toggle.checked:after {
+    opacity: 1;
+}
+
+.category-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.category-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.category-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.category-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.default-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.default-container .toggle {
+    margin: 0;
+}
+
+.default-container .state-select {
+    margin-bottom: 0;
+}
+
+.state-select {
+    margin-left: 10px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: none;
+    background: rgba(255,255,255,0.25);
+    color: white;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    min-width: 100px;
+}
+
+.state-select option {
+    background: #263238;
+    color: white;
+    padding: 5px;
+}
+
+.state-select:hover {
+    background: rgba(255,255,255,0.35);
+}
+
+.state-select:focus {
+    background: rgba(255,255,255,0.4);
+    outline: none;
+}
+
+.separator-line {
+    height: 1px;
+    background-color: #ccc;
+    margin: 10px 0;
+    width: 100%;
+}
+
+/* 添加输入框样式 - 已不再使用，设为隐藏 */
+.path-input {
+    display: none; /* 隐藏而不是完全删除，以防其他地方还在使用 */
+    background: rgba(255,255,255,0.25);
+    border: none;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    margin-left: 10px;
+    width: 300px;
+    font-family: "Roboto", helvetica, arial, sans-serif;
+}
+
+.path-input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+/* 添加导出按钮样式 */
+.action-button {
+    display: none;  /* 隐藏而不是完全删除，以防其他地方还在使用 */
+}
+
+/* URDF信息面板样式 */
+.urdf-info-panel {
+    background-color: transparent;
+    border-radius: 5px;
+    margin: 10px;
+    padding: 15px;
+    box-shadow: none;
+    display: none; /* 默认隐藏 */
+    position: absolute;
+    right: 40px; /* 调整位置，更靠右 */
+    top: 20px; /* 位于顶部 */
+    width: 700px;
+    z-index: 1000;
+    transition: all 0.3s ease, top 0.3s ease; /* 添加top属性的过渡效果 */
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(38, 50, 56, 0.8); /* 添加半透明背景 */
+    backdrop-filter: blur(5px); /* 添加模糊效果 */
+}
+
+/* segmentation模式下面板样式 */
+/* 由于现在只在segmentation模式下显示，直接设置基础样式即可 */
+.urdf-info-panel {
+    background-color: rgba(20, 20, 20, 0.8); /* 更深的背景色，适合黑色背景 */
+    border-left: 1px solid rgba(255, 255, 255, 0.5); /* 更明显的边框 */
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1); /* 添加轻微发光效果 */
+}
+
+/* segmentation模式下的文本样式 */
+.urdf-info-panel .urdf-info-header,
+.urdf-info-panel .joint-info-display,
+.urdf-info-panel .joint-detail,
+.urdf-info-panel .joint-item {
+    color: rgba(255, 255, 255, 0.9); /* 更亮的文本颜色 */
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.5); /* 添加文本阴影增强可读性 */
+}
+
+.urdf-info-panel .joint-item.active {
+    background-color: rgba(255, 255, 255, 0.2); /* 更明显的高亮效果 */
+    border-left: 3px solid rgba(255, 255, 255, 0.8); /* 更明显的边框 */
+}
+
+.urdf-info-panel.visible {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.urdf-info-header {
+    font-size: 20px;
+    font-weight: 100;
+    color: white;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 8px;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative; /* 确保定位上下文 */
+}
+
+.urdf-info-header:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.urdf-info-content {
+    font-size: 16px;
+    overflow: hidden;
+    transition: max-height 0.5s ease, opacity 0.5s ease;
+    max-height: 1500px; /* 从1000px增加到1500px，提供更多空间 */
+    opacity: 1; /* 确保展开状态下完全不透明 */
+}
+
+.urdf-info-content.collapsed {
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.urdf-controls {
+    margin-bottom: 10px;
+}
+
+.urdf-viewer-container {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    max-height: 800px; /* 从500px增加到800px */
+    overflow-y: auto;
+    border-radius: 5px;
+    background-color: rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.urdf-viewer {
+    margin: 0;
+    padding: 10px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #f8f8f2;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-x: hidden; /* 修改为hidden，防止水平滚动条 */
+}
+
+.urdf-viewer code {
+    font-family: inherit;
+}
+
+/* URDF语法高亮样式 */
+.urdf-tag {
+    color: #ff79c6;
+}
+
+.urdf-attr {
+    color: #50fa7b;
+}
+
+.urdf-value {
+    color: #f1fa8c;
+}
+
+.urdf-comment {
+    color: #6272a4;
+    font-style: italic;
+}
+
+/* 高亮样式 */
+.highlight-link {
+    background-color: rgba(76, 175, 80, 0.3);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+
+.highlight-joint {
+    background-color: rgba(33, 150, 243, 0.3);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+
+.highlight-visual {
+    background-color: rgba(255, 193, 7, 0.3);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+
+.highlight-collision {
+    background-color: rgba(244, 67, 54, 0.3);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+
+.highlight-active {
+    background-color: rgba(255, 255, 255, 0.4);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+
+/* 图例样式 */
+.urdf-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+}
+
+.legend-text {
+    color: white;
+    font-size: 14px;
+}
+
+/* 折叠/展开图标样式 */
+.info-toggle {
+    transition: transform 0.3s ease, background-color 0.2s;
+    font-size: 16px;
+    user-select: none;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 6;
+}
+
+.info-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.info-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.info-item .toggle {
+    display: inline-block;
+    position: relative;
+    padding: 5px 10px;
+    margin: 5px 0;
+    background-color: rgba(38, 50, 56, 0.8);
+    color: #cfd8dc;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    z-index: 10; /* 增加z-index确保按钮可点击 */
+    pointer-events: auto; /* 确保点击事件不被阻止 */
+}
+
+.info-item .toggle:before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: -7px;
+    top: calc(50% - 7px);
+    border-radius: 50%;
+    background-color: #455a64;
+    transition: all 0.2s ease;
+    pointer-events: none; /* 确保伪元素不会阻止点击 */
+}
+
+.info-item .toggle:after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    left: -5px;
+    top: calc(50% - 5px);
+    border-radius: 50%;
+    background-color: #78909c;
+    transition: all 0.2s ease;
+    pointer-events: none; /* 确保伪元素不会阻止点击 */
+}
+
+.info-item .toggle:not(.checked):hover:after {
+    background-color: #b0bec5;
+}
+
+.info-item .toggle.checked:after {
+    background-color: #4caf50;
+}
+
+/* 添加关节信息显示相关的CSS样式 */
+.joint-info-display {
+    width: 100%;
+    height: auto; /* 从100%改为auto，允许根据内容自动扩展 */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; /* 只允许垂直滚动 */
+    overflow-x: hidden; /* 禁止水平滚动 */
+    font-family: 'Roboto', sans-serif;
+    max-height: none; /* 移除最大高度限制 */
+}
+
+.joint-info-placeholder {
+    padding: 40px 20px; /* 增加上下内边距 */
+    text-align: center;
+    color: #90a4ae;
+    font-size: 18px; /* 增加字体大小 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: auto; /* 从100%改为auto */
+    min-height: 200px; /* 添加最小高度 */
+    flex-direction: column;
+    background-color: rgba(55, 71, 79, 0.5); /* 添加背景色 */
+    border-radius: 4px; /* 添加圆角 */
+    margin: 20px 0; /* 添加上下外边距 */
+}
+
+.joint-summary {
+    padding: 15px;
+    border-bottom: 1px solid #455a64;
+}
+
+.joint-summary h3 {
+    margin: 0 0 10px 0;
+    color: #eceff1;
+    font-weight: 400;
+    font-size: 18px;
+}
+
+.joint-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 800px; /* 从150px增加到800px，使展开的长度更长 */
+    overflow-y: auto;
+    border-radius: 4px;
+    background-color: #37474f;
+}
+
+.joint-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #455a64;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.joint-item:last-child {
+    border-bottom: none;
+}
+
+.joint-item:hover, .joint-item.active {
+    background-color: #455a64;
+}
+
+.joint-name {
+    font-weight: 500;
+    color: #eceff1;
+}
+
+.joint-type {
+    color: #78909c;
+    font-size: 0.9em;
+}
+
+.joint-hover-instruction {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #78909c;
+    text-align: center;
+    font-style: italic;
+}
+
+.joint-detail-container {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #2c3e50;
+    border-radius: 4px;
+    margin-top: 10px;
+    max-height: 600px; /* 增加最大高度，确保有足够的空间显示详情 */
+}
+
+.joint-detail {
+    color: #eceff1;
+}
+
+.joint-detail h4 {
+    margin: 0 0 15px 0;
+    color: #4fc3f7;
+    font-weight: 400;
+    font-size: 20px;
+    border-bottom: 1px solid #455a64;
+    padding-bottom: 8px;
+}
+
+.joint-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.joint-detail-table td {
+    padding: 8px 4px;
+    vertical-align: top;
+}
+
+.detail-label {
+    color: #90a4ae;
+    font-weight: 500;
+    width: 120px; /* 从100px增加到120px */
+}
+
+.detail-value {
+    color: #eceff1;
+    word-break: break-word; /* 允许长文本换行 */
+}
+
+.limits-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #37474f;
+    border-radius: 4px;
+}
+
+.limits-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #455a64;
+}
+
+.limits-table tr:last-child td {
+    border-bottom: none;
+}
+
+.limits-table td:first-child {
+    color: #90a4ae;
+    width: 80px;
+}
+
+.limits-table td:last-child {
+    word-break: break-word; /* 允许长文本换行 */
+}
+
+
+
+/*# sourceMappingURL=styles.8986bff4.css.map */
