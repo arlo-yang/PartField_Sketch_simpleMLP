@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/hy-tmp/virtual_scanner/build/cmake_install.cmake",
+		"/hy-tmp/virtual_scanner/build/_libvirtualscanner/cmake_install.cmake",
+		"/hy-tmp/virtual_scanner/build/_virtualscanner/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

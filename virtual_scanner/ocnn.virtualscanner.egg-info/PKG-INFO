@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: ocnn.virtualscanner
+Version: 18.9.5
+Summary: Virtual scanner utilities
+Author: Microsoft
+Author-email: dapisani@microsoft.com
+Requires-Dist: Cython
+Requires-Dist: pyyaml

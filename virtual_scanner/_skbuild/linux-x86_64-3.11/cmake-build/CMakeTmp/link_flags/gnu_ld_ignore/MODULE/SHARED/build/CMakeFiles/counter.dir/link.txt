@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -Wl,--unresolved-symbols=ignore-all -shared  -o counter.so CMakeFiles/counter.dir/counter.c.o
