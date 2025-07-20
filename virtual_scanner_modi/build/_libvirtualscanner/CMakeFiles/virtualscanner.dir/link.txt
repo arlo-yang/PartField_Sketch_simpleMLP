@@ -1,0 +1,2 @@
+/usr/bin/ar qc libvirtualscanner.a CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o CMakeFiles/virtualscanner.dir/src/points.cpp.o
+/usr/bin/ranlib libvirtualscanner.a

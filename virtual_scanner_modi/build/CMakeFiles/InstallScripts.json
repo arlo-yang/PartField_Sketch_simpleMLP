@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/cmake_install.cmake",
+		"/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_libvirtualscanner/cmake_install.cmake",
+		"/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_virtualscanner/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC -shared -Wl,-soname,libnumber.so -o libnumber.so CMakeFiles/number.dir/number.c.o
