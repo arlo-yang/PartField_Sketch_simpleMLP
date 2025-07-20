@@ -1,5 +1,5 @@
 # 数据目录
-
+Data/*
 javascript/urdf/*
 javascript/node_modules/*
 partfield/model/*

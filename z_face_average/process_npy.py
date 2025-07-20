@@ -88,12 +88,12 @@ def calculate_distances(features, feature_center):
 def classify_faces(distances, face_ids):
     """根据距离阈值对所有面片进行分类
     
-    使用候选集合中的最大距离作为阈值
-    公式：|| F_i - F_m ||^2 ≤ max_{j ∈ S} || F_j - F_m ||^2
+    使用候选集合中的平均距离作为阈值
+    公式：|| F_i - F_m ||^2 ≤ average_{j ∈ S} || F_j - F_m ||^2
     """
-    # 计算阈值：使用候选集合距离的最大值
+    # 计算阈值：使用候选集合距离的平均值
     candidate_distances = distances[face_ids]
-    threshold = np.max(candidate_distances)
+    threshold = np.mean(candidate_distances)
     
     # 分类所有面片
     movable_mask = distances <= threshold
@@ -162,7 +162,7 @@ def process_single_result(result_path):
     movable_face_ids, threshold = classify_faces(distances, initial_face_ids)
     print(f"- 初始候选面片数: {len(initial_face_ids)}")
     print(f"- 最终可动部件面片数: {len(movable_face_ids)}")
-    print(f"- 使用的距离阈值: {threshold:.6f} (候选集最大距离)")
+    print(f"- 使用的距离阈值: {threshold:.6f} (候选集平均距离)")
     
     # 特征距离统计
     initial_distances = distances[initial_face_ids]
