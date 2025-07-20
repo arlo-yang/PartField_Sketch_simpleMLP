@@ -35,6 +35,8 @@ int main(int argc, char* argv[]) {
     scanner.scanning(all_files[i], view_num, flag, normalize);
     string out_path  = all_files[i].substr(0, all_files[i].rfind('.'));
     scanner.save_ply(out_path + ".ply");
+    // 生成面片ID的txt文件
+    scanner.save_face_ids_txt(out_path + "_face_ids.txt");
     clock_t t2 = clock();
 
     string messg = all_files[i].substr(all_files[i].rfind('\\') + 1) +

@@ -603,3 +603,28 @@ bool VirtualScanner::save_binary_legacy(const string& filename) {
 
   return true;
 }
+
+bool VirtualScanner::save_face_ids_txt(const string& filename) {
+  ofstream outfile(filename, std::ios::out);
+  if (!outfile) {
+    cout << "Open " << filename << " error!" << endl;
+    return false;
+  }
+
+  // 写入表头
+  outfile << "# 点云与面片ID对应关系" << endl;
+  outfile << "# 格式: 点索引, 面片ID, x, y, z" << endl;
+  outfile << "# -------------------------------" << endl;
+
+  int n = pts_.size() / 3;  // 点的数量
+  
+  // 写入每个点的索引和对应的面片ID
+  for (int i = 0; i < n; ++i) {
+    outfile << i << ", " << face_indices_[i] << ", "
+            << pts_[3*i] << ", " << pts_[3*i+1] << ", " << pts_[3*i+2] << endl;
+  }
+
+  outfile.close();
+  cout << "面片ID已保存到: " << filename << endl;
+  return true;
+}
