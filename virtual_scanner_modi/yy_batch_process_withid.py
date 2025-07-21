@@ -12,7 +12,7 @@ from tqdm import tqdm
 INPUT_DIR = "data/original_obj"     # 输入模型目录
 OUTPUT_DIR = "data/ply"             # 输出PLY目录
 FACEID_DIR = "data/face_ids"        # 面片ID输出目录
-VIEW_NUM = 30                       # 视角数量
+VIEW_NUM = 14                       # 视角数量
 NORMALIZE = True                    # 是否归一化
 WORKERS = 8                         # 线程数量
 SCANNER_PATH = "./build/virtualscanner"  # virtualscanner程序路径

@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <set>
 #include "virtual_scanner/virtual_scanner.h"
 
 // CGAL
@@ -537,11 +538,11 @@ bool VirtualScanner::save_ply(const string& filename) {
     }
   } else {
     // 原有输出格式
-    for (int i = 0; i < n; ++i) {
-      sprintf(pstr + i * len,
-          "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-          pts_[3 * i], pts_[3 * i + 1], pts_[3 * i + 2],
-          normals_[3 * i], normals_[3 * i + 1], normals_[3 * i + 2]);
+  for (int i = 0; i < n; ++i) {
+    sprintf(pstr + i * len,
+        "%.6f %.6f %.6f %.6f %.6f %.6f\n",
+        pts_[3 * i], pts_[3 * i + 1], pts_[3 * i + 2],
+        normals_[3 * i], normals_[3 * i + 1], normals_[3 * i + 2]);
     }
   }
 
@@ -611,20 +612,25 @@ bool VirtualScanner::save_face_ids_txt(const string& filename) {
     return false;
   }
 
-  // 写入表头
-  outfile << "# 点云与面片ID对应关系" << endl;
-  outfile << "# 格式: 点索引, 面片ID, x, y, z" << endl;
-  outfile << "# -------------------------------" << endl;
+  // 收集唯一的面片ID
+  std::set<int> unique_face_ids;
+  for (const auto& id : face_indices_) {
+    if (id >= 0) { // 只添加有效的面片ID
+      unique_face_ids.insert(id);
+    }
+  }
 
-  int n = pts_.size() / 3;  // 点的数量
+  // 写入表头
+  outfile << "# 射线击中的面片ID列表" << endl;
+  outfile << "# 格式: 面片ID" << endl;
+  outfile << "# -------------------------------" << endl;
   
-  // 写入每个点的索引和对应的面片ID
-  for (int i = 0; i < n; ++i) {
-    outfile << i << ", " << face_indices_[i] << ", "
-            << pts_[3*i] << ", " << pts_[3*i+1] << ", " << pts_[3*i+2] << endl;
+  // 写入排序后的唯一面片ID（set已自动排序）
+  for (const auto& id : unique_face_ids) {
+    outfile << id << endl;
   }
 
   outfile.close();
-  cout << "面片ID已保存到: " << filename << endl;
+  cout << "面片ID已保存到: " << filename << " (共" << unique_face_ids.size() << "个面片)" << endl;
   return true;
 }

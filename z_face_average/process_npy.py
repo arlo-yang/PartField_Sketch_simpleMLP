@@ -1,17 +1,17 @@
 """
-Step 3：找到初步的候选面片集合 S
+Step 1：找到初步的候选面片集合 S
 - 通过 back-projection：
     - 从 mesh 渲染出 face ID map；
     - 看哪些 face 的投影 pixel 落在 mask M 中；
     - 这些面组成集合 S：可动部分 mask 覆盖的可见面片集合。
 
-Step 4：计算候选面的平均特征 Fₘ
+Step 2：计算候选面的平均特征 Fₘ
 公式：
     F_m = (1 / |S|) * Σ_i∈S F_i
 - 拿 S 中每个面片的特征 F_i，取均值；
 - 得到代表 mask 区域可动部分的"特征中心"。
 
-Step 5：对所有 mesh 的面片做特征距离分类
+Step 3：对所有 mesh 的面片做特征距离分类
 - 对每个 face i，算与 Fₘ 的欧式距离：
     || F_i - F_m ||^2
 - 判断规则：
@@ -68,34 +68,28 @@ def load_face_ids(face_ids_path):
     return face_ids
 
 def compute_feature_center(features, face_ids):
-    """计算候选面片集合的特征中心"""
-    # 确保face_ids在有效范围内
+    """Calculate feature center for the candidate face set"""
+    # Ensure face_ids are within valid range
     valid_face_ids = [fid for fid in face_ids if fid < features.shape[0]]
     if not valid_face_ids:
-        raise ValueError("所有面片ID都超出特征范围")
+        raise ValueError("All face IDs are out of feature range")
     
-    # 提取这些面片的特征并计算均值
+    # Extract features for these faces and calculate the mean
     selected_features = features[valid_face_ids]
     feature_center = np.mean(selected_features, axis=0)
     return feature_center
 
 def calculate_distances(features, feature_center):
-    """计算所有面片特征到特征中心的距离"""
-    # 使用欧氏距离计算特征差异
+    # Use Euclidean distance to calculate feature differences
     distances = np.sum((features - feature_center) ** 2, axis=1)
     return distances
 
 def classify_faces(distances, face_ids):
-    """根据距离阈值对所有面片进行分类
-    
-    使用候选集合中的平均距离作为阈值
-    公式：|| F_i - F_m ||^2 ≤ average_{j ∈ S} || F_j - F_m ||^2
-    """
-    # 计算阈值：使用候选集合距离的平均值
+    # Calculate threshold: use max value of distances in the candidate set
     candidate_distances = distances[face_ids]
-    threshold = np.mean(candidate_distances)
+    threshold = np.max(candidate_distances)
     
-    # 分类所有面片
+    # Classify all faces
     movable_mask = distances <= threshold
     movable_face_ids = np.where(movable_mask)[0]
     

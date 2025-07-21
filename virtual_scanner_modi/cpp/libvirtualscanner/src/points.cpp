@@ -125,12 +125,12 @@ bool Points::write_ply(const string & filename) const {
     }
   } else {
     // 原有输出格式
-    for (int i = 0; i < n; ++i) {
-      sprintf(pstr + i * len,
-          "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-          pts[3 * i], pts[3 * i + 1], pts[3 * i + 2],
-          normals[3 * i], normals[3 * i + 1], normals[3 * i + 2]);
-    }
+  for (int i = 0; i < n; ++i) {
+    sprintf(pstr + i * len,
+        "%.6f %.6f %.6f %.6f %.6f %.6f\n",
+        pts[3 * i], pts[3 * i + 1], pts[3 * i + 2],
+        normals[3 * i], normals[3 * i + 1], normals[3 * i + 2]);
+  }
   }
   
   int k = 0;

@@ -1,0 +1,61 @@
+# 数据目录
+/data/*
+!/data/.gitkeep
+
+segmentation/data/img/*
+segmentation/data/urdf/*
+segmentation/data/predict/*
+segmentation/data/samesh_result/*
+segmentation/data/urdf_angle/*
+
+segmentation/outputs/*
+
+# 模型检查点
+/singapo/exps/*
+!/singapo/exps/.gitkeep
+
+/javascript/segmentation/*
+javascript/urdf/*
+javascript/urdf_source/*
+
+# demo 生成的输出
+/singapo/demo/demo_output/*
+!/singapo/demo/demo_output/pred_graph.json
+!/singapo/demo/demo_output/pred_graph.png
+
+# 预训练模型
+/singapo/pretrained/*
+!/singapo/pretrained/.gitkeep
+
+# 大文件
+*.pt
+*.ckpt
+*.pack
+*.wandb
+*.zip
+*.tar.gz
+*.pth  
+
+/samesh/checkpoint/*
+/samesh/outputs/*
+
+# 常见的系统文件
+.DS_Store
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 环境相关
+.venv
+env/
+venv/
+ENV/
+
+# 日志文件
+*.log
+
+# IDE 相关
+.idea/
+.vscode/
+*.swp
+*.swo 
