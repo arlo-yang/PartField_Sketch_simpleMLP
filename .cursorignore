@@ -20,6 +20,10 @@ z_face_average/greenred/*
 # 预训练模型
 /singapo/pretrained/*
 !/singapo/pretrained/.gitkeep
+data_small/img_copy/*
+
+segmentation/data/*
+segmentation2/data/*
 
 # 大文件
 *.pt

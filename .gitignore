@@ -7,6 +7,7 @@ data/img/*
 data/urdf/*
 PartField_Sketch_simpleMLP/data_small/*
 data_small/img/*
+data_small/img_copy/*
 data_small/urdf/*
 data_small/result/*
 z_face_average/greenred/*
@@ -19,6 +20,11 @@ z_face_average/greenred/*
 # 预训练模型
 /singapo/pretrained/*
 !/singapo/pretrained/.gitkeep
+
+
+segmentation/data/*
+segmentation2/data/*
+
 
 # 大文件
 *.pt

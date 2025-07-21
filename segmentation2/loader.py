@@ -6,6 +6,7 @@ import numpy as np
 import json
 import random
 import shutil
+import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
@@ -33,15 +34,6 @@ def default_transforms(train=True):
         ])
 
 
-def extract_view_key(filename):
-    """
-    从新的文件命名格式中提取视图信息
-    [Category]_[ID]_[RenderType].png
-    注意：新格式不再包含视图信息
-    """
-    return None  # 新格式不再包含视图信息
-
-
 def parse_filename(filename):
     """
     解析文件名为各个组件
@@ -51,7 +43,7 @@ def parse_filename(filename):
     Args:
         filename: 文件名
     Returns:
-        字典包含类别、ID、渲染类型、关节ID(如果有)
+        字典包含类别、ID、渲染类型、视角、关节ID(如果有)
     """
     # 先提取基本部分：类别、ID、渲染类型
     base_pattern = r'^([a-zA-Z]+)_(\d+)_([a-zA-Z\-]+)'
@@ -64,24 +56,43 @@ def parse_filename(filename):
     obj_id = base_match.group(2)
     render_type = base_match.group(3)
     
+    # 获取剩余部分（可能包含视角和关节ID）
+    remaining = filename[len(base_match.group(0)):]
+    
     # 检查是否包含joint信息
     joint_pattern = r'_joint_(\d+)'
-    joint_match = re.search(joint_pattern, filename)
+    joint_match = re.search(joint_pattern, remaining)
     joint_id = joint_match.group(1) if joint_match else None
     
+    # 提取视角信息（如果存在）
+    # 视角通常在渲染类型之后，关节ID之前
+    view = None
+    if joint_match:
+        view_part = remaining[:joint_match.start()]
+        if view_part.startswith('_') and len(view_part) > 1:
+            view = view_part[1:]  # 去掉开头的下划线
+    elif remaining.startswith('_') and len(remaining) > 1:
+        # 没有关节ID但有视角
+        view = remaining[1:].split('.')[0]  # 去掉扩展名
+    
     # 构建结果
-    return {
+    result = {
         'category': category,
         'id': obj_id,
         'render_type': render_type,
-        'joint': joint_id
+        'joint': joint_id,
+        'view': view
     }
+    
+    return result
 
 
-class NewArticulatedDataset(Dataset):
+class SimplifiedArticulatedDataset(Dataset):
     def __init__(self, root_dir, split='train', transform=None, verbose=True):
         """
-        适用于新数据格式的数据集类
+        简化版的数据集类，只处理同时具有segmentation和arrow-sketch的图像，
+        并确保它们的类别、ID、关节ID和视角完全匹配
+        
         Args:
             root_dir (str): 数据集根目录。
             split (str): 数据集类型，'train', 'val', 'test'。
@@ -104,7 +115,7 @@ class NewArticulatedDataset(Dataset):
         if self.verbose:
             print(f"[DEBUG] Found {len(self.all_images)} PNG files in {self.root_dir}")
 
-        # 按照类别_ID分组（不再包含视图）
+        # 按照类别_ID分组
         self.grouped_images = {}
         for img_path in self.all_images:
             filename = os.path.basename(img_path)
@@ -118,73 +129,51 @@ class NewArticulatedDataset(Dataset):
             if group_key not in self.grouped_images:
                 self.grouped_images[group_key] = {}
             
-            # 处理带joint信息的文件
-            if parsed['joint'] is not None:
-                # 创建特定joint的键，例如"arrow-sketch_joint_1"或"segmentation_joint_1"
-                render_joint_key = f"{parsed['render_type']}_joint_{parsed['joint']}"
-                self.grouped_images[group_key][render_joint_key] = img_path
-            else:
-                # 基本渲染类型(无joint信息)
-                self.grouped_images[group_key][parsed['render_type']] = img_path
+            # 只处理segmentation和arrow-sketch图像
+            if parsed['render_type'] == 'segmentation' or parsed['render_type'] == 'arrow-sketch':
+                if parsed['joint'] is not None:
+                    # 创建包含渲染类型、关节ID和视角的完整键
+                    view_part = f"_{parsed['view']}" if parsed['view'] else ""
+                    render_joint_view_key = f"{parsed['render_type']}_joint_{parsed['joint']}{view_part}"
+                    self.grouped_images[group_key][render_joint_view_key] = {
+                        'path': img_path,
+                        'parsed': parsed
+                    }
         
-        # 过滤掉不完整的组（必须有default, normal, depth和至少一个segmentation）
+        # 过滤，只保留同时具有segmentation和arrow-sketch的完整组，且确保视角匹配
         self.complete_groups = []
         for group_key, files in self.grouped_images.items():
-            # 检查是否包含必要的基本渲染类型
-            has_default = 'default' in files
-            has_normal = 'normal' in files
-            has_depth = 'depth' in files
+            # 找出所有segmentation类型
+            seg_entries = {k: v for k, v in files.items() if k.startswith('segmentation_joint_')}
             
-            # 找出所有segmentation和arrow-sketch类型（包含joint信息）
-            seg_types = [k for k in files.keys() if k.startswith('segmentation_joint_')]
-            arrow_types = [k for k in files.keys() if k.startswith('arrow-sketch_joint_')]
-            
-            # 如果具有所有必要的渲染类型和至少一个分割，则添加到完整组
-            if has_default and has_normal and has_depth and len(seg_types) > 0:
-                # 分解group_key以获取类别和ID
-                parts = group_key.split('_')
-                category = parts[0]
-                obj_id = parts[1]
+            # 为每个segmentation找到对应视角的arrow-sketch
+            for seg_key, seg_info in seg_entries.items():
+                seg_parsed = seg_info['parsed']
+                joint_id = seg_parsed['joint']
+                view = seg_parsed['view']
                 
-                # 为每个joint创建一个完整的样本
-                for seg_type in seg_types:
-                    # 提取joint编号
-                    joint_id = seg_type.split('_')[-1]
-                    
-                    # 找到对应的arrow-sketch（如果存在）
-                    arrow_key = f"arrow-sketch_joint_{joint_id}"
-                    has_arrow = arrow_key in files
+                # 创建对应的arrow-sketch键
+                view_part = f"_{view}" if view else ""
+                arrow_key = f"arrow-sketch_joint_{joint_id}{view_part}"
+                
+                if arrow_key in files:  # 只有同时具有两种类型且视角匹配的才加入
+                    # 分解group_key以获取类别和ID
+                    parts = group_key.split('_')
+                    category = parts[0]
+                    obj_id = parts[1]
                     
                     sample = {
                         'category': category,
                         'id': obj_id,
                         'joint': joint_id,
-                        'default': files.get('default'),
-                        'normal': files.get('normal'),
-                        'depth': files.get('depth'),
-                        'arrow-sketch': files.get(arrow_key) if has_arrow else None,
-                        'segmentation': files.get(seg_type)
+                        'view': view,
+                        'arrow-sketch': files[arrow_key]['path'],
+                        'segmentation': files[seg_key]['path']
                     }
                     
-                    # 确保segmentation一定存在
-                    if sample['segmentation'] is None:
-                        if self.verbose:
-                            print(f"[WARN] 跳过 {group_key} 的 joint {joint_id}: 缺少分割图")
-                        continue
-                    
-                    # 如果缺少arrow-sketch，记录警告但仍然继续
-                    if not has_arrow:
-                        if self.verbose:
-                            print(f"[WARN] Group {group_key} joint {joint_id} missing arrow-sketch, but will continue")
-                    
                     self.complete_groups.append(sample)
-            else:
-                if self.verbose:
-                    missing = []
-                    if not has_default: missing.append('default')
-                    if not has_normal: missing.append('normal')
-                    if not has_depth: missing.append('depth')
-                    print(f"[DEBUG] Incomplete group {group_key}: missing {missing}")
+                elif self.verbose:
+                    print(f"[SKIP] Group {group_key} joint {joint_id} view '{view}': missing matching arrow-sketch")
         
         if self.verbose:
             print(f"[INFO] Created {len(self.complete_groups)} complete samples from {len(self.grouped_images)} groups")
@@ -199,81 +188,36 @@ class NewArticulatedDataset(Dataset):
         sample = self.complete_groups[idx]
         
         # 读取各种图像
-        default_path = sample['default']
-        normal_path = sample['normal']
-        depth_path = sample['depth']
         arrow_sketch_path = sample['arrow-sketch']
         segmentation_path = sample['segmentation']
         
         # 读取图像
-        default_img = cv2.imread(default_path, cv2.IMREAD_COLOR)
-        normal_img = cv2.imread(normal_path, cv2.IMREAD_COLOR)
-        depth_img = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
         segment_img = cv2.imread(segmentation_path, cv2.IMREAD_UNCHANGED)
-        
-        # 处理arrow-sketch图像（如果存在）
-        if arrow_sketch_path and os.path.exists(arrow_sketch_path):
-            arrow_img = cv2.imread(arrow_sketch_path, cv2.IMREAD_COLOR)
-            has_arrow = True
-        else:
-            # 如果没有arrow-sketch，用零张量代替
-            has_arrow = False
-            if default_img is not None:
-                H, W = default_img.shape[:2]
-                arrow_img = np.zeros((H, W, 3), dtype=np.float32)
-            else:
-                raise RuntimeError(f"[ERROR] Cannot create placeholder for arrow-sketch: default image is None")
+        arrow_img = cv2.imread(arrow_sketch_path, cv2.IMREAD_COLOR)
         
         # 检查图像是否成功读取
-        if default_img is None:
-            raise RuntimeError(f"[ERROR] Failed to read default image: {default_path}")
-        if normal_img is None:
-            raise RuntimeError(f"[ERROR] Failed to read normal image: {normal_path}")
-        if depth_img is None:
-            raise RuntimeError(f"[ERROR] Failed to read depth image: {depth_path}")
         if segment_img is None:
             raise RuntimeError(f"[ERROR] Failed to read segmentation image: {segmentation_path}")
-        if has_arrow and arrow_img is None:
+        if arrow_img is None:
             raise RuntimeError(f"[ERROR] Failed to read arrow-sketch image: {arrow_sketch_path}")
-        
-        # 处理depth图像 - 确保是单通道并归一化
-        if depth_img.ndim == 3:
-            depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGR2GRAY)
-        
-        if depth_img.max() > 0:
-            depth_img = depth_img.astype(np.float32) / depth_img.max()
-        else:
-            depth_img = depth_img.astype(np.float32)
         
         # 处理segmentation图像 - 确保是单通道并二值化
         if segment_img.ndim == 3:
             segment_img = cv2.cvtColor(segment_img, cv2.COLOR_BGR2GRAY)
         segment_img = (segment_img > 127).astype(np.float32)
         
-        # 归一化并转换BGR到RGB
-        default_img = default_img.astype(np.float32) / 255.0
-        normal_img = normal_img.astype(np.float32) / 255.0
+        # 归一化并转换BGR到RGB (对arrow-sketch)
         arrow_img = arrow_img.astype(np.float32) / 255.0
-        
         # BGR->RGB
-        default_img = default_img[..., ::-1]
-        normal_img = normal_img[..., ::-1]
         arrow_img = arrow_img[..., ::-1]
         
-        # 创建单通道depth和分割图像
-        H, W = depth_img.shape
-        depth_1ch = depth_img.reshape(H, W, 1)
+        # 创建单通道分割图像
+        H, W = segment_img.shape
         seg_1ch = segment_img.reshape(H, W, 1)
         
-        # 根据是否有arrow-sketch决定输入通道数
-        if has_arrow:
-            # 合并为10通道：3(default) + 3(normal) + 1(depth) + 3(arrow-sketch)
-            inp_ch = np.concatenate([default_img, normal_img, depth_1ch, arrow_img], axis=-1)
-            num_channels = 10
-        else:
-            # 合并为7通道：3(default) + 3(normal) + 1(depth)
-            inp_ch = np.concatenate([default_img, normal_img, depth_1ch], axis=-1)
-            num_channels = 7
+        # 输入是arrow-sketch（3通道）
+        inp_ch = arrow_img
+        num_channels = 3
         
         if self.transform:
             # 合并输入和标签以确保相同的变换应用于两者
@@ -290,59 +234,32 @@ class NewArticulatedDataset(Dataset):
             'category': sample['category'],
             'id': sample['id'],
             'joint': sample['joint'],
-            'has_arrow': has_arrow
+            'view': sample['view'],
+            'has_arrow': True  # 所有样本现在都有arrow-sketch
         }
         
         return inp_tensor, lab_tensor, meta
 
 
-def new_collate_fn(batch):
+def simplified_collate_fn(batch):
     """
-    自定义 collate_fn，适用于新的数据集格式
-    处理可变长度的输入张量（因为有些样本可能包含arrow-sketch而有些不包含）
+    简化版的 collate_fn，适用于只处理同时具有segmentation和arrow-sketch的数据集
     """
-    inp_lists = {
-        'with_arrow': [],    # 包含arrow-sketch的样本
-        'without_arrow': []  # 不包含arrow-sketch的样本
-    }
-    lab_lists = {
-        'with_arrow': [],
-        'without_arrow': []
-    }
+    inp_list = []
+    lab_list = []
     meta_list = []
     
-    # 根据是否有arrow-sketch分类
+    # 所有样本现在都有相同的格式
     for inp, lab, meta in batch:
-        if meta['has_arrow']:
-            inp_lists['with_arrow'].append(inp)
-            lab_lists['with_arrow'].append(lab)
-        else:
-            inp_lists['without_arrow'].append(inp)
-            lab_lists['without_arrow'].append(lab)
+        inp_list.append(inp)
+        lab_list.append(lab)
         meta_list.append(meta)
     
     # 创建结果张量
-    result_tensors = []
+    inp_tensor = torch.stack(inp_list, dim=0)
+    lab_tensor = torch.stack(lab_list, dim=0)
     
-    # 处理包含arrow-sketch的样本
-    if inp_lists['with_arrow']:
-        inp_with_arrow = torch.stack(inp_lists['with_arrow'], dim=0)
-        lab_with_arrow = torch.stack(lab_lists['with_arrow'], dim=0)
-        result_tensors.append((inp_with_arrow, lab_with_arrow))
-    
-    # 处理不包含arrow-sketch的样本
-    if inp_lists['without_arrow']:
-        inp_without_arrow = torch.stack(inp_lists['without_arrow'], dim=0)
-        lab_without_arrow = torch.stack(lab_lists['without_arrow'], dim=0)
-        result_tensors.append((inp_without_arrow, lab_without_arrow))
-    
-    # 如果所有样本都有相同数量的通道，我们可以简化返回值
-    if not inp_lists['without_arrow'] or not inp_lists['with_arrow']:
-        if result_tensors:
-            return result_tensors[0][0], result_tensors[0][1], meta_list
-    
-    # 如果有不同通道数的样本，返回分开的张量和元数据
-    return result_tensors, meta_list
+    return inp_tensor, lab_tensor, meta_list
 
 
 def split_dataset(data_dir, output_dir=None, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, seed=42):
@@ -386,10 +303,12 @@ def split_dataset(data_dir, output_dir=None, train_ratio=0.7, val_ratio=0.15, te
         filename = os.path.basename(img_path)
         parsed = parse_filename(filename)
         if parsed:
-            key = (parsed['category'], parsed['id'])
-            if key not in category_id_dict:
-                category_id_dict[key] = []
-            category_id_dict[key].append(img_path)
+            # 只处理segmentation和arrow-sketch图像
+            if parsed['render_type'] == 'segmentation' or parsed['render_type'] == 'arrow-sketch':
+                key = (parsed['category'], parsed['id'])
+                if key not in category_id_dict:
+                    category_id_dict[key] = []
+                category_id_dict[key].append(img_path)
     
     # 获取所有唯一的(类别, ID)对
     all_category_ids = list(category_id_dict.keys())
@@ -446,19 +365,93 @@ def split_dataset(data_dir, output_dir=None, train_ratio=0.7, val_ratio=0.15, te
     return split_mapping
 
 
-def test_new_loader():
-    """测试新的数据集加载器"""
+def visualize_pairs(dataset, num_samples=10, save_dir="./data_pairs"):
+    """
+    可视化数据集中的arrow-sketch和segmentation配对
+    
+    Args:
+        dataset: SimplifiedArticulatedDataset实例
+        num_samples: 要可视化的样本数量
+        save_dir: 保存可视化结果的目录
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 确保不超出数据集大小
+    num_samples = min(num_samples, len(dataset))
+    
+    print(f"\n[VISUALIZE] 正在生成{num_samples}个数据对的可视化...")
+    
+    for i in range(num_samples):
+        # 获取样本
+        inp, lab, meta = dataset[i]
+        
+        # 转换为numpy数组用于可视化
+        inp_np = inp.numpy().transpose(1, 2, 0)  # [C,H,W] -> [H,W,C]
+        lab_np = lab.numpy()[0]  # [1,H,W] -> [H,W]
+        
+        # 确保值在0-1范围内
+        inp_np = np.clip(inp_np, 0, 1)
+        
+        # 创建2x2的子图
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        
+        # 显示arrow-sketch输入
+        axes[0].imshow(inp_np)
+        axes[0].set_title("Arrow-Sketch Input")
+        axes[0].axis('off')
+        
+        # 显示segmentation标签
+        axes[1].imshow(lab_np, cmap='gray', vmin=0, vmax=1)
+        axes[1].set_title("Segmentation GT")
+        axes[1].axis('off')
+        
+        # 叠加显示
+        overlay = inp_np.copy()
+        # 创建红色掩码
+        mask = np.zeros_like(overlay)
+        mask[:, :, 0] = lab_np  # 红色通道
+        
+        # 应用半透明掩码
+        overlay = overlay * 0.7 + mask * 0.3
+        overlay = np.clip(overlay, 0, 1)
+        
+        axes[2].imshow(overlay)
+        axes[2].set_title("Overlay")
+        axes[2].axis('off')
+        
+        # 添加图像元信息作为标题
+        category = meta['category']
+        obj_id = meta['id']
+        joint_id = meta['joint']
+        view = meta['view'] if meta['view'] else "no_view"
+        
+        fig.suptitle(f"Category: {category}, ID: {obj_id}, Joint: {joint_id}, View: {view}", fontsize=14)
+        
+        # 保存图像
+        save_path = os.path.join(save_dir, f"pair_{i:02d}_{category}_joint{joint_id}_{view}.png")
+        plt.savefig(save_path, bbox_inches='tight', dpi=150)
+        plt.close(fig)
+        
+        print(f"  已保存: {save_path}")
+    
+    print(f"[VISUALIZE] 完成! 可视化结果已保存到 {save_dir}/")
+    return save_dir
+
+
+def test_simplified_loader():
+    """测试简化版的数据集加载器"""
     # 指定数据目录
     data_dir = "data/img"
     
     # 测试数据解析
     print("\n[TEST] Testing filename parsing...")
     test_filenames = [
-        "Microwave_7366_default_top_left.png",
-        "Microwave_7366_normal_direct_right.png",
-        "Microwave_7366_segmentation_bottom_center_joint_1.png",
-        "Safe_102316_depth_front_high.png",
-        "Table_19898_arrow-sketch_joint_4.png",  # 添加一个arrow-sketch示例
+        "Microwave_7366_default_top_left.png",  # 将被忽略
+        "Microwave_7366_segmentation_front_center_joint_1.png",  # 带视角的segmentation
+        "Microwave_7366_segmentation_top_view_joint_1.png",  # 不同视角的segmentation
+        "Microwave_7366_arrow-sketch_front_center_joint_1.png",  # 匹配第一个segmentation的arrow-sketch
+        "Safe_102316_depth_front_high.png",  # 将被忽略
+        "Table_19898_arrow-sketch_joint_4.png",  # 无视角的arrow-sketch
         "InvalidName.png"
     ]
     
@@ -467,13 +460,18 @@ def test_new_loader():
         if parsed:
             print(f"File: {filename}")
             print(f"  Parsed: {parsed}")
+            # 检查是否是我们需要的图像类型
+            if parsed['render_type'] in ['segmentation', 'arrow-sketch']:
+                print(f"  This is a required image type: {parsed['render_type']}")
+            else:
+                print(f"  This is NOT a required image type: {parsed['render_type']}")
         else:
             print(f"File: {filename} -> Invalid format")
     
     # 测试数据集加载
-    print("\n[TEST] Testing NewArticulatedDataset...")
+    print("\n[TEST] Testing SimplifiedArticulatedDataset...")
     try:
-        dataset = NewArticulatedDataset(root_dir=data_dir, split='train', transform=None, verbose=True)
+        dataset = SimplifiedArticulatedDataset(root_dir=data_dir, split='train', transform=None, verbose=True)
         print(f"Successfully created dataset with {len(dataset)} samples")
         
         # 测试获取几个样本
@@ -493,7 +491,7 @@ def test_new_loader():
             batch_size=2,
             shuffle=True,
             num_workers=0,
-            collate_fn=new_collate_fn
+            collate_fn=simplified_collate_fn
         )
         
         for i, (inp_batch, lab_batch, meta_batch) in enumerate(loader):
@@ -506,6 +504,11 @@ def test_new_loader():
             if i >= 1:
                 break
         
+        # 可视化10个配对样本
+        if len(dataset) > 0:
+            vis_dir = visualize_pairs(dataset, num_samples=10, save_dir="./data_pairs")
+            print(f"\n[INFO] 10个数据对的可视化结果已保存在: {vis_dir}")
+            
     except Exception as e:
         print(f"[ERROR] An error occurred: {e}")
     
@@ -540,5 +543,6 @@ def test_new_loader():
         print(f"[ERROR] An error occurred during splitting: {e}")
 
 
+# 如果直接运行此脚本，则执行测试
 if __name__ == "__main__":
-    test_new_loader() 
+    test_simplified_loader()
