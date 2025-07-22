@@ -60,3 +60,5 @@ ENV/
 .vscode/
 *.swp
 *.swo javascript/node_modules/
+data/*
+data_small/*

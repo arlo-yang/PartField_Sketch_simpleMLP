@@ -5,6 +5,7 @@ javascript/node_modules/*
 partfield/model/*
 data/img/*
 data/urdf/*
+data/*
 Data/*
 PartField_Sketch_simpleMLP/data_small/*
 data_small/img/*
