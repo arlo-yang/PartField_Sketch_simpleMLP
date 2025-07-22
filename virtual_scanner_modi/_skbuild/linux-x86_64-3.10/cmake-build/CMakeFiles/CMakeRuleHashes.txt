@@ -1,2 +1,0 @@
-# Hashes of file build rules.
-1ed5cc7ef6454f96ffebb856d89ac26f python/ocnn/virtualscanner/_virtualscanner.cxx

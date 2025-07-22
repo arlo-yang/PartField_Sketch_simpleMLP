@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/hy-tmp/virtual_scanner/cpp/libvirtualscanner/src/points.cpp" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o" "gcc" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o.d"
-  "/hy-tmp/virtual_scanner/cpp/libvirtualscanner/src/virtual_scanner.cpp" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o" "gcc" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o.d"
+  "/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/libvirtualscanner/src/points.cpp" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o" "gcc" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o.d"
+  "/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/libvirtualscanner/src/virtual_scanner.cpp" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o" "gcc" "_libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

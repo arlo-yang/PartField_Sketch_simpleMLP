@@ -1,5 +1,0 @@
-2025-07-21 22:30:06,071 INFO: Start training with args: Namespace(data_dir='data/img', out_dir='./outputs_sketch2seg', batch_size=64, lr=0.0001, num_epochs=70, num_workers=20, log_interval=10, val_interval=1, resume='', features=128)
-2025-07-21 22:30:06,118 INFO: Using device: cuda
-2025-07-21 22:30:06,247 INFO: Using SketchSegmentUNet with base_features=128
-2025-07-21 22:30:07,133 INFO: Model parameters: 124,133,249
-2025-07-21 22:30:07,328 INFO: No checkpoint found; training from scratch.

@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/hy-tmp/virtual_scanner/_skbuild/linux-x86_64-3.11/cmake-build/CMakeTmp/link_flags/gnu_ld_ignore/MODULE/SHARED/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

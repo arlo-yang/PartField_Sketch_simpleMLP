@@ -1,1 +1,0 @@
-/usr/bin/cc -Wl,--export-dynamic -rdynamic CMakeFiles/main.dir/main.c.o -o main  -Wl,-rpath,/hy-tmp/virtual_scanner/_skbuild/linux-x86_64-3.11/cmake-build/CMakeTmp/link_flags/gnu_ld_ignore/MODULE/SHARED/build libnumber.so -ldl

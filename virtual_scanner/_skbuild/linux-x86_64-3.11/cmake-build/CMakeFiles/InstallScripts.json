@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/hy-tmp/virtual_scanner/_skbuild/linux-x86_64-3.11/cmake-build/cmake_install.cmake",
-		"/hy-tmp/virtual_scanner/_skbuild/linux-x86_64-3.11/cmake-build/python/ocnn/virtualscanner/cmake_install.cmake",
-		"/hy-tmp/virtual_scanner/_skbuild/linux-x86_64-3.11/cmake-build/python/ocnn/virtualscanner/_libvirtualscanner/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

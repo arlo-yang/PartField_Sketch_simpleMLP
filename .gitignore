@@ -20,7 +20,7 @@ z_face_average/greenred/*
 # 预训练模型
 /singapo/pretrained/*
 !/singapo/pretrained/.gitkeep
-
+segmentation2/outputs_sketch2seg/*
 
 segmentation/data/*
 segmentation2/data/*

@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner/_skbuild/linux-x86_64-3.10/cmake-build/cmake_install.cmake",
-		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner/_skbuild/linux-x86_64-3.10/cmake-build/python/ocnn/virtualscanner/cmake_install.cmake",
-		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner/_skbuild/linux-x86_64-3.10/cmake-build/python/ocnn/virtualscanner/_libvirtualscanner/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

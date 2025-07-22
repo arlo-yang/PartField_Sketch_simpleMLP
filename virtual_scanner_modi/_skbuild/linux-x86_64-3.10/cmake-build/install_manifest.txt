@@ -1,1 +1,0 @@
-/home/ipab-graphics/workplace/User_web_dev/virtual_scanner/_skbuild/linux-x86_64-3.10/cmake-install/python/ocnn/virtualscanner/_virtualscanner.cpython-310-x86_64-linux-gnu.so

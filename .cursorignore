@@ -24,6 +24,7 @@ data_small/img_copy/*
 
 segmentation/data/*
 segmentation2/data/*
+segmentation2/outputs_sketch2seg/*
 
 # 大文件
 *.pt

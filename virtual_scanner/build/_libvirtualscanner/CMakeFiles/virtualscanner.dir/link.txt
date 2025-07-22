@@ -1,2 +1,2 @@
-/usr/bin/ar qc libvirtualscanner.a CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o CMakeFiles/virtualscanner.dir/src/points.cpp.o
-/usr/bin/ranlib libvirtualscanner.a
+/home/ipab-graphics/miniconda3/envs/singapo/bin/x86_64-conda-linux-gnu-ar qc libvirtualscanner.a CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o CMakeFiles/virtualscanner.dir/src/points.cpp.o
+/home/ipab-graphics/miniconda3/envs/singapo/bin/x86_64-conda-linux-gnu-ranlib libvirtualscanner.a

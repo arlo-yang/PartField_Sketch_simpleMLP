@@ -1,9 +1,9 @@
 {
 	"InstallScripts" : 
 	[
-		"/hy-tmp/virtual_scanner/build/cmake_install.cmake",
-		"/hy-tmp/virtual_scanner/build/_libvirtualscanner/cmake_install.cmake",
-		"/hy-tmp/virtual_scanner/build/_virtualscanner/cmake_install.cmake"
+		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/cmake_install.cmake",
+		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_libvirtualscanner/cmake_install.cmake",
+		"/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

@@ -45,19 +45,19 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake
+CMAKE_COMMAND = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake
 
 # The command to remove a file.
-RM = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake -E rm -f
+RM = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake -E rm -f
 
 # Escaping for special characters.
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /hy-tmp/virtual_scanner
+CMAKE_SOURCE_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /hy-tmp/virtual_scanner/build
+CMAKE_BINARY_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -127,14 +127,14 @@ _virtualscanner/clean: _virtualscanner/CMakeFiles/virtualscannerexe.dir/clean
 _libvirtualscanner/CMakeFiles/virtualscanner.dir/all:
 	$(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/depend
 	$(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=1,2,3 "Built target virtualscanner"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=1,2,3 "Built target virtualscanner"
 .PHONY : _libvirtualscanner/CMakeFiles/virtualscanner.dir/all
 
 # Build rule for subdir invocation for target.
 _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/CMakeFiles/virtualscanner.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles 0
 .PHONY : _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
 
 # Convenience name for target.
@@ -144,7 +144,7 @@ virtualscanner: _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
 # codegen rule for target.
 _libvirtualscanner/CMakeFiles/virtualscanner.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=1,2,3 "Finished codegen for target virtualscanner"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=1,2,3 "Finished codegen for target virtualscanner"
 .PHONY : _libvirtualscanner/CMakeFiles/virtualscanner.dir/codegen
 
 # clean rule for target.
@@ -159,14 +159,14 @@ _libvirtualscanner/CMakeFiles/virtualscanner.dir/clean:
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/all: _libvirtualscanner/CMakeFiles/virtualscanner.dir/all
 	$(MAKE) $(MAKESILENT) -f _virtualscanner/CMakeFiles/virtualscannerexe.dir/build.make _virtualscanner/CMakeFiles/virtualscannerexe.dir/depend
 	$(MAKE) $(MAKESILENT) -f _virtualscanner/CMakeFiles/virtualscannerexe.dir/build.make _virtualscanner/CMakeFiles/virtualscannerexe.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=4,5 "Built target virtualscannerexe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=4,5 "Built target virtualscannerexe"
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/all
 
 # Build rule for subdir invocation for target.
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles 5
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles 5
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _virtualscanner/CMakeFiles/virtualscannerexe.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles 0
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/rule
 
 # Convenience name for target.
@@ -176,7 +176,7 @@ virtualscannerexe: _virtualscanner/CMakeFiles/virtualscannerexe.dir/rule
 # codegen rule for target.
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f _virtualscanner/CMakeFiles/virtualscannerexe.dir/build.make _virtualscanner/CMakeFiles/virtualscannerexe.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=4,5 "Finished codegen for target virtualscannerexe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=4,5 "Finished codegen for target virtualscannerexe"
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/codegen
 
 # clean rule for target.

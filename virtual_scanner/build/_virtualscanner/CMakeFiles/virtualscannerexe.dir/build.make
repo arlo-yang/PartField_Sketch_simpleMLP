@@ -44,19 +44,19 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake
+CMAKE_COMMAND = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake
 
 # The command to remove a file.
-RM = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake -E rm -f
+RM = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake -E rm -f
 
 # Escaping for special characters.
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /hy-tmp/virtual_scanner
+CMAKE_SOURCE_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /hy-tmp/virtual_scanner/build
+CMAKE_BINARY_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build
 
 # Include any dependencies generated for this target.
 include _virtualscanner/CMakeFiles/virtualscannerexe.dir/depend.make
@@ -73,18 +73,18 @@ _virtualscanner/CMakeFiles/virtualscannerexe.dir/codegen:
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/codegen
 
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o: _virtualscanner/CMakeFiles/virtualscannerexe.dir/flags.make
-_virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o: /hy-tmp/virtual_scanner/cpp/virtualscanner/src/main.cpp
+_virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o: /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/virtualscanner/src/main.cpp
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o: _virtualscanner/CMakeFiles/virtualscannerexe.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o"
-	cd /hy-tmp/virtual_scanner/build/_virtualscanner && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o -MF CMakeFiles/virtualscannerexe.dir/src/main.cpp.o.d -o CMakeFiles/virtualscannerexe.dir/src/main.cpp.o -c /hy-tmp/virtual_scanner/cpp/virtualscanner/src/main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o"
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner && /home/ipab-graphics/miniconda3/envs/singapo/bin/x86_64-conda-linux-gnu-c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o -MF CMakeFiles/virtualscannerexe.dir/src/main.cpp.o.d -o CMakeFiles/virtualscannerexe.dir/src/main.cpp.o -c /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/virtualscanner/src/main.cpp
 
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/virtualscannerexe.dir/src/main.cpp.i"
-	cd /hy-tmp/virtual_scanner/build/_virtualscanner && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /hy-tmp/virtual_scanner/cpp/virtualscanner/src/main.cpp > CMakeFiles/virtualscannerexe.dir/src/main.cpp.i
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner && /home/ipab-graphics/miniconda3/envs/singapo/bin/x86_64-conda-linux-gnu-c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/virtualscanner/src/main.cpp > CMakeFiles/virtualscannerexe.dir/src/main.cpp.i
 
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/virtualscannerexe.dir/src/main.cpp.s"
-	cd /hy-tmp/virtual_scanner/build/_virtualscanner && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /hy-tmp/virtual_scanner/cpp/virtualscanner/src/main.cpp -o CMakeFiles/virtualscannerexe.dir/src/main.cpp.s
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner && /home/ipab-graphics/miniconda3/envs/singapo/bin/x86_64-conda-linux-gnu-c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/virtualscanner/src/main.cpp -o CMakeFiles/virtualscannerexe.dir/src/main.cpp.s
 
 # Object files for target virtualscannerexe
 virtualscannerexe_OBJECTS = \
@@ -95,27 +95,27 @@ virtualscannerexe_EXTERNAL_OBJECTS =
 
 virtualscanner: _virtualscanner/CMakeFiles/virtualscannerexe.dir/src/main.cpp.o
 virtualscanner: _virtualscanner/CMakeFiles/virtualscannerexe.dir/build.make
-virtualscanner: /usr/lib/x86_64-linux-gnu/libboost_filesystem.so.1.74.0
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libboost_filesystem.so.1.74.0
 virtualscanner: _libvirtualscanner/libvirtualscanner.a
-virtualscanner: /usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so
-virtualscanner: /usr/lib/x86_64-linux-gnu/libpthread.a
-virtualscanner: /usr/lib/x86_64-linux-gnu/libboost_system.so.1.74.0
-virtualscanner: /usr/lib/x86_64-linux-gnu/libgmpxx.so
-virtualscanner: /usr/lib/x86_64-linux-gnu/libmpfr.so
-virtualscanner: /usr/lib/x86_64-linux-gnu/libgmp.so
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libgomp.so
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/x86_64-conda-linux-gnu/sysroot/usr/lib64/libpthread.so
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libboost_system.so.1.74.0
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libgmpxx.so
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libmpfr.so
+virtualscanner: /home/ipab-graphics/miniconda3/envs/singapo/lib/libgmp.so
 virtualscanner: _virtualscanner/CMakeFiles/virtualscannerexe.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/hy-tmp/virtual_scanner/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../virtualscanner"
-	cd /hy-tmp/virtual_scanner/build/_virtualscanner && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/virtualscannerexe.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../virtualscanner"
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/virtualscannerexe.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/build: virtualscanner
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/build
 
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/clean:
-	cd /hy-tmp/virtual_scanner/build/_virtualscanner && $(CMAKE_COMMAND) -P CMakeFiles/virtualscannerexe.dir/cmake_clean.cmake
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner && $(CMAKE_COMMAND) -P CMakeFiles/virtualscannerexe.dir/cmake_clean.cmake
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/clean
 
 _virtualscanner/CMakeFiles/virtualscannerexe.dir/depend:
-	cd /hy-tmp/virtual_scanner/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /hy-tmp/virtual_scanner /hy-tmp/virtual_scanner/cpp/virtualscanner /hy-tmp/virtual_scanner/build /hy-tmp/virtual_scanner/build/_virtualscanner /hy-tmp/virtual_scanner/build/_virtualscanner/CMakeFiles/virtualscannerexe.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/cpp/virtualscanner /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_virtualscanner/CMakeFiles/virtualscannerexe.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : _virtualscanner/CMakeFiles/virtualscannerexe.dir/depend
 

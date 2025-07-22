@@ -1,8 +1,0 @@
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/CMakeFiles/edit_cache.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/CMakeFiles/rebuild_cache.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_libvirtualscanner/CMakeFiles/virtualscanner.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_libvirtualscanner/CMakeFiles/edit_cache.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_libvirtualscanner/CMakeFiles/rebuild_cache.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_virtualscanner/CMakeFiles/virtualscannerexe.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_virtualscanner/CMakeFiles/edit_cache.dir
-/hy-tmp/PartField_Sketch_simpleMLP/virtual_scanner_modi/build/_virtualscanner/CMakeFiles/rebuild_cache.dir

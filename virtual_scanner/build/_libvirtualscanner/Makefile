@@ -48,19 +48,19 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake
+CMAKE_COMMAND = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake
 
 # The command to remove a file.
-RM = /usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake -E rm -f
+RM = /home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake -E rm -f
 
 # Escaping for special characters.
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /hy-tmp/virtual_scanner
+CMAKE_SOURCE_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /hy-tmp/virtual_scanner/build
+CMAKE_BINARY_DIR = /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -68,7 +68,7 @@ CMAKE_BINARY_DIR = /hy-tmp/virtual_scanner/build
 # Special rule for the target edit_cache
 edit_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "No interactive CMake dialog available..."
-	/usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+	/home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -78,7 +78,7 @@ edit_cache/fast: edit_cache
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Running CMake to regenerate build system..."
-	/usr/local/lib/python3.11/dist-packages/cmake/data/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	/home/ipab-graphics/miniconda3/envs/singapo/lib/python3.10/site-packages/cmake/data/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
 # Special rule for the target rebuild_cache
@@ -87,14 +87,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /hy-tmp/virtual_scanner/build && $(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles /hy-tmp/virtual_scanner/build/_libvirtualscanner//CMakeFiles/progress.marks
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /hy-tmp/virtual_scanner/build/CMakeFiles 0
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/_libvirtualscanner//CMakeFiles/progress.marks
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/clean
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/clean
 .PHONY : clean
 
 # The main clean target
@@ -103,22 +103,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/preinstall
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/preinstall
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /hy-tmp/virtual_scanner/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
 .PHONY : _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
 
 # Convenience name for target.
@@ -127,7 +127,7 @@ virtualscanner: _libvirtualscanner/CMakeFiles/virtualscanner.dir/rule
 
 # fast build rule for target.
 virtualscanner/fast:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/build
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/build
 .PHONY : virtualscanner/fast
 
 src/points.o: src/points.cpp.o
@@ -135,7 +135,7 @@ src/points.o: src/points.cpp.o
 
 # target to build an object file
 src/points.cpp.o:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.o
 .PHONY : src/points.cpp.o
 
 src/points.i: src/points.cpp.i
@@ -143,7 +143,7 @@ src/points.i: src/points.cpp.i
 
 # target to preprocess a source file
 src/points.cpp.i:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.i
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.i
 .PHONY : src/points.cpp.i
 
 src/points.s: src/points.cpp.s
@@ -151,7 +151,7 @@ src/points.s: src/points.cpp.s
 
 # target to generate assembly for a file
 src/points.cpp.s:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.s
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/points.cpp.s
 .PHONY : src/points.cpp.s
 
 src/virtual_scanner.o: src/virtual_scanner.cpp.o
@@ -159,7 +159,7 @@ src/virtual_scanner.o: src/virtual_scanner.cpp.o
 
 # target to build an object file
 src/virtual_scanner.cpp.o:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.o
 .PHONY : src/virtual_scanner.cpp.o
 
 src/virtual_scanner.i: src/virtual_scanner.cpp.i
@@ -167,7 +167,7 @@ src/virtual_scanner.i: src/virtual_scanner.cpp.i
 
 # target to preprocess a source file
 src/virtual_scanner.cpp.i:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.i
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.i
 .PHONY : src/virtual_scanner.cpp.i
 
 src/virtual_scanner.s: src/virtual_scanner.cpp.s
@@ -175,7 +175,7 @@ src/virtual_scanner.s: src/virtual_scanner.cpp.s
 
 # target to generate assembly for a file
 src/virtual_scanner.cpp.s:
-	cd /hy-tmp/virtual_scanner/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.s
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(MAKE) $(MAKESILENT) -f _libvirtualscanner/CMakeFiles/virtualscanner.dir/build.make _libvirtualscanner/CMakeFiles/virtualscanner.dir/src/virtual_scanner.cpp.s
 .PHONY : src/virtual_scanner.cpp.s
 
 # Help Target
@@ -204,6 +204,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /hy-tmp/virtual_scanner/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/ipab-graphics/workplace/User_web_dev/virtual_scanner_cp/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 
