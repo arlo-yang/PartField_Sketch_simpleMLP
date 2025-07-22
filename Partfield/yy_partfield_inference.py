@@ -31,7 +31,7 @@ class CustomWholeObjDataset(Demo_Dataset):
         torch.utils.data.Dataset.__init__(self)
         
         # 确保使用正确的数据路径
-        self.data_path = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf"  # 直接硬编码URDF路径
+        self.data_path = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified"  # 直接硬编码URDF路径
         print(f"使用数据路径: {self.data_path}")
         
         self.is_pc = False  # 我们处理的是网格数据
@@ -203,7 +203,7 @@ def predict(cfg):
             model_id = batch['uid'][0]
             
             # 创建输出目录
-            output_dir = os.path.join("/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature")
+            output_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified", model_id, "feature")
             os.makedirs(output_dir, exist_ok=True)
             
             # 检查是否已经处理过
@@ -290,7 +290,7 @@ def predict(cfg):
                 return torch.cat(all_sample, dim=1)
             
             # 保存原始网格信息，用于后续比较
-            original_mesh_path = os.path.join("/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "yy_merged.obj")
+            original_mesh_path = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified", model_id, "yy_merged.obj")
             from partfield.utils import load_mesh_util
             original_mesh = load_mesh_util(original_mesh_path)
             # 确保是三角形网格

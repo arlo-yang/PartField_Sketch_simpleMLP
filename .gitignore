@@ -1,13 +1,13 @@
 # 数据目录
-Data/*
+
 javascript/urdf/*
 javascript/node_modules/*
 partfield/model/*
 data/img/*
 data/urdf/*
+Data/*
 PartField_Sketch_simpleMLP/data_small/*
 data_small/img/*
-data_small/img_copy/*
 data_small/urdf/*
 data_small/result/*
 z_face_average/greenred/*
@@ -20,12 +20,14 @@ z_face_average/greenred/*
 # 预训练模型
 /singapo/pretrained/*
 !/singapo/pretrained/.gitkeep
-segmentation2/outputs_sketch2seg/*
+data_small/img_copy/*
 
 segmentation/data/*
 segmentation2/data/*
-
-
+segmentation2/outputs_sketch2seg/*
+PartField_Sketch_simpleMLP/Partfield/lightning_logs/*
+data_small/urdf_shell/*
+data_small/urdf_simpified/*
 # 大文件
 *.pt
 *.ckpt

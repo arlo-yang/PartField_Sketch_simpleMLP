@@ -25,7 +25,9 @@ data_small/img_copy/*
 segmentation/data/*
 segmentation2/data/*
 segmentation2/outputs_sketch2seg/*
-
+PartField_Sketch_simpleMLP/Partfield/lightning_logs/*
+data_small/urdf_shell/*
+data_small/urdf_simpified/*
 # 大文件
 *.pt
 *.ckpt

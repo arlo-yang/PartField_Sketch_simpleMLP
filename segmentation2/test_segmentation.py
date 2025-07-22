@@ -8,11 +8,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from tqdm import tqdm
 
-# -----------------------------------
-# 导入模型和数据加载器
-# -----------------------------------
 from loader import SimplifiedArticulatedDataset, simplified_collate_fn, default_transforms
 from network import SketchSegmentUNet
 
@@ -25,28 +23,28 @@ except ImportError:
 
 # --------------------------- 参数解析 ---------------------------
 def parse_args():
-    parser = argparse.ArgumentParser(description="PyTorch Sketch‑to‑Segmentation Testing")
+    parser = argparse.ArgumentParser(
+        description="PyTorch Sketch‑to‑Segmentation Testing (mask‑relative confidence可视化 + 原始prob保存)")
 
     parser.add_argument("--data_dir",        type=str, default="data/img",
-                        help="Root directory; should contain 'test' subfolder.")
+                        help="Dataset root (必须含 test 子目录).")
     parser.add_argument("--out_dir",         type=str, default="./outputs_sketch2seg",
-                        help="Directory to save logs / visualizations.")
-    parser.add_argument("--batch_size",      type=int, default=12,
-                        help="Batch size for testing.")
-    parser.add_argument("--num_workers",     type=int, default=20,
-                        help="Number of DataLoader workers.")
+                        help="日志 / 可视化输出目录.")
+    parser.add_argument("--batch_size",      type=int, default=12)
+    parser.add_argument("--num_workers",     type=int, default=20)
     parser.add_argument("--resume",          type=str, default="",
-                        help="Checkpoint path; default uses best_model.pth in out_dir.")
-    parser.add_argument("--features",        type=int, default=128,
-                        help="Base features of UNet (match training).")
-    parser.add_argument("--visualize_count", type=int, default=50,
-                        help="Number of samples to save as PNG.")
+                        help="模型 checkpoint (.pth). 默认尝试 out_dir/best_model.pth")
+    parser.add_argument("--features",        type=int, default=128)
+    parser.add_argument("--visualize_count", type=int, default=150,
+                        help="保存多少张可视化.")
+    parser.add_argument("--save_confidence", action="store_true",
+                        help="保存原始 prob 为 .npy")
     return parser.parse_args()
 
 
 # --------------------------- DataLoader ---------------------------
 def create_dataloader(data_dir, split, batch_size, num_workers, shuffle=False):
-    transform = default_transforms(False)  # 测试集无增强
+    transform = default_transforms(False)
     dataset = SimplifiedArticulatedDataset(
         root_dir=data_dir,
         split=split,
@@ -72,10 +70,9 @@ def dice_loss(prob, target, eps=1e-6):
 
 
 def combined_loss(logits, target, alpha=0.5):
-    bce = nn.BCEWithLogitsLoss()(logits, target)
+    bce  = nn.BCEWithLogitsLoss()(logits, target)
     prob = torch.sigmoid(logits)
-    dsc = dice_loss(prob, target)
-    return alpha * bce + (1 - alpha) * dsc
+    return alpha * bce + (1 - alpha) * dice_loss(prob, target)
 
 
 def tensor_bool(logits, thr=0.5):
@@ -116,15 +113,16 @@ def test_model(model,
                dataloader,
                device,
                writer=None,
-               visualize_count=50,
-               out_dir="./outputs_sketch2seg"):
+               visualize_count=150,
+               out_dir="./outputs_sketch2seg",
+               save_confidence=False):
     model.eval()
 
     criterion = combined_loss
     total_loss = total_iou = total_acc = total_prec = total_rec = 0.0
     sample_cnt = 0
 
-    images_to_vis = []
+    vis_samples = []
     vis_saved = 0
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader),
@@ -137,26 +135,18 @@ def test_model(model,
         logits = model(inp)
         loss   = criterion(logits, tgt)
 
-        # 评估
-        batch_iou  = compute_iou(logits, tgt)
-        batch_acc  = compute_pixel_accuracy(logits, tgt)
-        batch_prec = compute_precision(logits, tgt)
-        batch_rec  = compute_recall(logits, tgt)
-
         total_loss += loss.item() * bs
-        total_iou  += batch_iou  * bs
-        total_acc  += batch_acc  * bs
-        total_prec += batch_prec * bs
-        total_rec  += batch_rec  * bs
+        total_iou  += compute_iou(logits, tgt)  * bs
+        total_acc  += compute_pixel_accuracy(logits, tgt) * bs
+        total_prec += compute_precision(logits, tgt) * bs
+        total_rec  += compute_recall(logits, tgt) * bs
         sample_cnt += bs
 
-        # 收集可视化样本
         for b in range(bs):
             if vis_saved < visualize_count:
-                images_to_vis.append({
-                    "inp":  inp[b].cpu(),
-                    "pred": logits[b].cpu(),
-                    "gt":   tgt[b].cpu(),
+                vis_samples.append({
+                    "prob": torch.sigmoid(logits[b]).cpu(),  # [1,H,W]
+                    "gt":   tgt[b].cpu(),                    # [1,H,W]
                     "meta": meta[b]
                 })
                 vis_saved += 1
@@ -171,14 +161,63 @@ def test_model(model,
             "rec":  f"{total_rec  / sample_cnt:.4f}"
         })
 
-    avg_loss = total_loss / sample_cnt if sample_cnt else 0
-    avg_iou  = total_iou  / sample_cnt if sample_cnt else 0
-    avg_acc  = total_acc  / sample_cnt if sample_cnt else 0
-    avg_prec = total_prec / sample_cnt if sample_cnt else 0
-    avg_rec  = total_rec  / sample_cnt if sample_cnt else 0
+    vis_dir = os.path.join(out_dir, "test_composite")
+    os.makedirs(vis_dir, exist_ok=True)
+    conf_dir = os.path.join(out_dir, "confidence_npy")
+    if save_confidence:
+        os.makedirs(conf_dir, exist_ok=True)
 
-    print(f"[Test] Loss={avg_loss:.4f} | IoU={avg_iou:.4f} | "
-          f"Acc={avg_acc:.4f} | Precision={avg_prec:.4f} | Recall={avg_rec:.4f}")
+    cmap = cm.get_cmap('jet')
+
+    for idx, item in enumerate(vis_samples):
+        prob_np = item["prob"].numpy()[0]           # (H,W) 原始概率
+        gt_np   = item["gt"].numpy()[0]             # (H,W)
+        pred_bin = (prob_np > 0.5).astype(np.uint8) # (H,W) 0/1
+
+        # -------- 可视化映射（不影响 prob_np） --------
+        mask_vals = prob_np[pred_bin == 1]
+        if mask_vals.size > 0:
+            v_max = mask_vals.max()
+            if v_max > 0.5:
+                vis_vals = (prob_np - 0.5) / (v_max - 0.5)
+                vis_vals = np.clip(vis_vals, 0.0, 1.0)
+            else:
+                vis_vals = np.zeros_like(prob_np)
+        else:
+            vis_vals = np.zeros_like(prob_np)
+
+        color_rgba = cmap(vis_vals)
+        color_rgba[..., 3] = pred_bin  # alpha = mask
+
+        meta = item["meta"]
+        cat  = meta.get("category", "unk")
+        j_id = meta.get("joint",    "unk")
+
+        # -------- 三联图 --------
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        axes[0].imshow(color_rgba)
+        axes[0].set_title("Masked Rel‑Confidence")
+        axes[1].imshow(pred_bin, cmap='gray', vmin=0, vmax=1)
+        axes[1].set_title("Pred Mask")
+        axes[2].imshow(gt_np,   cmap='gray', vmin=0, vmax=1)
+        axes[2].set_title("GT Mask")
+        for ax in axes:
+            ax.axis("off")
+        fig.tight_layout()
+
+        save_path = os.path.join(vis_dir, f"sample_{idx:03d}_{cat}_j{j_id}.png")
+        plt.savefig(save_path, bbox_inches="tight", dpi=150)
+        plt.close(fig)
+
+        if save_confidence:
+            np.save(os.path.join(conf_dir, f"conf_{idx:03d}_{cat}_j{j_id}.npy"),
+                    prob_np.astype(np.float32))
+
+    avg_loss = total_loss / sample_cnt
+    avg_iou  = total_iou  / sample_cnt
+    avg_acc  = total_acc  / sample_cnt
+    avg_prec = total_prec / sample_cnt
+    avg_rec  = total_rec  / sample_cnt
 
     if writer:
         writer.add_scalar("Test/Loss", avg_loss, 0)
@@ -186,57 +225,11 @@ def test_model(model,
         writer.add_scalar("Test/Acc",  avg_acc,  0)
         writer.add_scalar("Test/Prec", avg_prec, 0)
         writer.add_scalar("Test/Rec",  avg_rec,  0)
-
-    # ---------- 保存可视化 ----------
-    vis_dir = os.path.join(out_dir, "test_vis")
-    os.makedirs(vis_dir, exist_ok=True)
-    print(f"Saving visualizations to {vis_dir} ...")
-
-    for idx, item in enumerate(images_to_vis):
-        inp  = item["inp"].numpy().transpose(1, 2, 0)
-        pred = torch.sigmoid(item["pred"]).numpy()[0]
-        gt   = item["gt"].numpy()[0]
-        meta = item["meta"]
-
-        fig, axes = plt.subplots(1, 4, figsize=(20, 5))
-        axes[0].imshow(np.clip(inp, 0, 1))
-        axes[0].set_title("Arrow‑Sketch")
-        axes[1].imshow(pred, cmap="gray", vmin=0, vmax=1)
-        axes[1].set_title("Pred")
-        axes[2].imshow(gt, cmap="gray", vmin=0, vmax=1)
-        axes[2].set_title("GT")
-
-        overlay = np.clip(inp, 0, 1)
-        mask = np.zeros_like(overlay)
-        mask[:, :, 0] = (pred > 0.5).astype(np.float32)
-        overlay = overlay * 0.7 + mask * 0.3
-        axes[3].imshow(overlay)
-        axes[3].set_title("Overlay")
-
-        for ax in axes:
-            ax.axis("off")
-
-        cat  = meta.get("category", "unknown")
-        j_id = meta.get("joint",     "unknown")
-        fig.suptitle(f"Category: {cat} | Joint: {j_id}", fontsize=16)
-
-        save_path = os.path.join(vis_dir, f"sample_{idx:03d}_{cat}_joint{j_id}.png")
-        plt.savefig(save_path, bbox_inches="tight", dpi=150)
-        plt.close(fig)
-
-    # ---------- 保存数值结果 ----------
-    res_file = os.path.join(out_dir, "test_results.txt")
-    with open(res_file, "w") as f:
-        f.write("Test Results\n")
-        f.write(f"Loss:      {avg_loss:.6f}\n")
-        f.write(f"IoU:       {avg_iou:.6f}\n")
-        f.write(f"Accuracy:  {avg_acc:.6f}\n")
-        f.write(f"Precision: {avg_prec:.6f}\n")
-        f.write(f"Recall:    {avg_rec:.6f}\n")
-    print(f"Metrics written to {res_file}")
-
-    if writer:
         writer.close()
+
+    with open(os.path.join(out_dir, "test_results.txt"), "w") as f:
+        f.write(f"Loss: {avg_loss:.6f}\nIoU: {avg_iou:.6f}\nAcc: {avg_acc:.6f}\n")
+        f.write(f"Prec:{avg_prec:.6f}\nRec: {avg_rec:.6f}\n")
 
     return avg_loss, avg_iou, avg_acc, avg_prec, avg_rec
 
@@ -257,23 +250,19 @@ def main():
     writer = SummaryWriter(os.path.join(args.out_dir, "tb_logs_test")) \
              if TENSORBOARD_AVAILABLE else None
 
-    # ---------- 检查 checkpoint ----------
+    # ---------- checkpoint ----------
     if not args.resume:
         default_ckpt = os.path.join(args.out_dir, "best_model.pth")
         if os.path.isfile(default_ckpt):
             args.resume = default_ckpt
-            logger.info(f"No --resume given, using {args.resume}")
         else:
-            raise FileNotFoundError(
-                "Checkpoint not specified and default best_model.pth not found."
-            )
+            raise FileNotFoundError("Checkpoint not found.")
     if not os.path.isfile(args.resume):
         raise FileNotFoundError(f"Checkpoint '{args.resume}' does not exist.")
 
     # ---------- Data ----------
     test_loader = create_dataloader(
-        data_dir=args.data_dir,
-        split="test",
+        args.data_dir, 'test',
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False
@@ -285,7 +274,6 @@ def main():
                               base_features=args.features,
                               bilinear=False)
     if torch.cuda.device_count() > 1:
-        logger.info(f"Using {torch.cuda.device_count()} GPUs.")
         model = nn.DataParallel(model)
     model = model.to(device)
 
@@ -294,24 +282,15 @@ def main():
         model.module.load_state_dict(ckpt["model_state"])
     else:
         model.load_state_dict(ckpt["model_state"])
-    logger.info(f"Loaded checkpoint '{args.resume}' (epoch={ckpt.get('epoch','?')})")
-
-    total_params = sum(p.numel() for p in model.parameters())
-    logger.info(f"Model parameters: {total_params:,}")
 
     # ---------- Run Test ----------
-    test_loss, test_iou, test_acc, test_prec, test_rec = test_model(
-        model, test_loader, device, writer,
-        visualize_count=args.visualize_count,
-        out_dir=args.out_dir
-    )
-
-    logger.info("[Final Test Results]")
-    logger.info(f"Loss:      {test_loss:.6f}")
-    logger.info(f"IoU:       {test_iou:.6f}")
-    logger.info(f"Accuracy:  {test_acc:.6f}")
-    logger.info(f"Precision: {test_prec:.6f}")
-    logger.info(f"Recall:    {test_rec:.6f}")
+    test_model(model,
+               test_loader,
+               device,
+               writer,
+               visualize_count=args.visualize_count,
+               out_dir=args.out_dir,
+               save_confidence=args.save_confidence)
 
 
 if __name__ == "__main__":
