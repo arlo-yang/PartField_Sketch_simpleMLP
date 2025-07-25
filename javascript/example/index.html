@@ -147,29 +147,6 @@
         </div>
         <urdf-viewer up="-Z" display-shadow tabindex="0"></urdf-viewer>
 
-        <!-- URDF信息面板 -->
-        <div id="urdf-info-panel" class="urdf-info-panel">
-            <div class="urdf-info-header">
-                Joint Information
-                <span id="urdf-toggle" class="info-toggle">▼</span>
-            </div>
-            <div id="urdf-info-content" class="urdf-info-content">
-                <div class="urdf-controls">
-                    <div class="info-item">
-                        <span class="info-label">Joint Actions:</span>
-                        <button id="load-urdf-content" class="action-btn">Enable Joint Interaction</button>
-                    </div>
-                </div>
-                <div class="urdf-viewer-container">
-                    <div id="joint-info-display" class="joint-info-display">
-                        <div class="joint-info-placeholder">
-                            Hover over model parts to see joint information
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <script src="./src/index.js"></script>
         <script>
           window.addEventListener('load', async () => {

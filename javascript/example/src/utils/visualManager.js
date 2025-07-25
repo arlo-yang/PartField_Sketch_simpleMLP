@@ -8,7 +8,6 @@ import { loadArrowModel, applyArrowMaterial, removeArrowObject, removeArrowConta
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { initialModels } from '../models-config.js';
-import { clearHighlights } from './urdfInfo.js';
 
 // Materials 部分
 // ===============
@@ -464,10 +463,6 @@ export function updateRenderMode(mode, viewer, urdfPath, currentRenderMode, defa
                 window.currentJointId = jointId;
             }
             
-            // 清除任何现有的高亮
-            if (typeof clearHighlights === 'function') {
-                clearHighlights();
-            }
             
             loadArrowModel(urdfPath, viewer, () => {
                 applyArrowMaterial(renderType);

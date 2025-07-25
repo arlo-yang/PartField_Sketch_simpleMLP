@@ -5,7 +5,6 @@ import { applyURDFMaterialAndState, depthMaterial } from './visualManager.js';
 import { addScreenshotControl, addGalleryControl } from './seg_screenshot.js';
 import { addAxesControl, addViewControl } from './viewerSetup.js';
 import { registerDragEvents } from '../dragAndDrop.js';
-import { clearHighlights } from './urdfInfo.js';
 
 // 全局变量，用于存储当前的渲染模式
 window.currentRenderMode = 'default';
@@ -315,9 +314,6 @@ export function initUIControls(viewer, defaultLight) {
             window.currentJointId = arrowDefaultStyle.value;
             
             // 清除任何现有的高亮
-            if (typeof clearHighlights === 'function') {
-                clearHighlights();
-            }
             
             // 隐藏URDF模型
             if (viewer.robot) {
@@ -337,9 +333,6 @@ export function initUIControls(viewer, defaultLight) {
                 window.currentJointId = arrowDefaultStyle.value;
                 
                 // 清除任何现有的高亮
-                if (typeof clearHighlights === 'function') {
-                    clearHighlights();
-                }
                 
                 loadArrowModel(window.currentUrdfPath, viewer, () => {
                     // 隐藏URDF模型
@@ -363,9 +356,6 @@ export function initUIControls(viewer, defaultLight) {
                 window.currentJointId = arrowDefaultStyle.value;
                 
                 // 清除任何现有的高亮
-                if (typeof clearHighlights === 'function') {
-                    clearHighlights();
-                }
                 
                 loadArrowModel(window.currentUrdfPath, viewer, () => {
                     // 隐藏URDF模型
@@ -385,7 +375,6 @@ export function initUIControls(viewer, defaultLight) {
             if (arrowDefault.classList.contains('checked')) {
                 window.currentJointId = arrowDefaultStyle.value;
                 // 清除任何现有的高亮
-                clearHighlights();
                 handleArrowJointIdChange(viewer, window.currentUrdfPath, window.currentRenderMode, 'arrow-default', arrowDefaultStyle.value);
             }
         });
@@ -397,9 +386,6 @@ export function initUIControls(viewer, defaultLight) {
                 if (arrowSketch && arrowSketch.classList.contains('checked')) {
                     window.currentJointId = arrowSketchStyle.value;
                     // 清除任何现有的高亮
-                    if (typeof clearHighlights === 'function') {
-                        clearHighlights();
-                    }
                     handleArrowJointIdChange(viewer, window.currentUrdfPath, window.currentRenderMode, 'arrow-sketch', arrowSketchStyle.value);
                 }
             });
@@ -412,9 +398,6 @@ export function initUIControls(viewer, defaultLight) {
                 if (arrowWireframe && arrowWireframe.classList.contains('checked')) {
                     window.currentJointId = arrowWireframeStyle.value;
                     // 清除任何现有的高亮
-                    if (typeof clearHighlights === 'function') {
-                        clearHighlights();
-                    }
                     handleArrowJointIdChange(viewer, window.currentUrdfPath, window.currentRenderMode, 'arrow-wireframe', arrowWireframeStyle.value);
                 }
             });

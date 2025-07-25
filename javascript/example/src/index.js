@@ -5,9 +5,6 @@ import { setColor } from './utils/visualManager.js';
 import { initializeCategories, initURDFEvents } from './utils/modelManager.js';
 import { initViewerSetup } from './utils/viewerSetup.js';
 
-import { initUrdfInfo } from './utils/urdfInfo.js';
-
-
 // 注册自定义元素
 customElements.define('urdf-viewer', URDFManipulator);
 
@@ -51,22 +48,6 @@ async function init() {
 
         // 初始化 URDF 事件监听
         initURDFEvents(viewer);
-        
-        // 初始化URDF信息显示功能 - 只在需要时加载和执行
-        const currentMode = window.currentRenderMode || 'default';
-        if (currentMode === 'segmentation') {
-            initUrdfInfo(viewer);
-        } else {
-            // 监听渲染模式变化，以便在切换到segmentation模式时初始化
-            window.addEventListener('renderModeChanged', (e) => {
-                const mode = e.detail?.mode || 'default';
-                if (mode === 'segmentation' && !window.urdfInfoInitialized) {
-                    window.urdfInfoInitialized = true;
-                    initUrdfInfo(viewer);
-                }
-            });
-        }
-        
 
         // 更新模型分类列表
         await initializeCategories(viewer);
