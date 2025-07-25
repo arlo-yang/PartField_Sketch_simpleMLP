@@ -1,9 +1,8 @@
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('three'), require('three/examples/jsm/loaders/STLLoader.js'), require('three/examples/jsm/loaders/ColladaLoader.js')) :
-        typeof define === 'function' && define.amd ? define(['three', 'three/examples/jsm/loaders/STLLoader.js', 'three/examples/jsm/loaders/ColladaLoader.js'], factory) :
-            (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.URDFLoader = factory(global.THREE, global.THREE, global.THREE));
-})(this, (function (THREE, STLLoader_js, ColladaLoader_js) {
-    'use strict';
+    typeof define === 'function' && define.amd ? define(['three', 'three/examples/jsm/loaders/STLLoader.js', 'three/examples/jsm/loaders/ColladaLoader.js'], factory) :
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.URDFLoader = factory(global.THREE, global.THREE, global.THREE));
+})(this, (function (THREE, STLLoader_js, ColladaLoader_js) { 'use strict';
 
     function _interopNamespace(e) {
         if (e && e.__esModule) return e;
@@ -101,6 +100,7 @@
         }
 
         set jointType(v) {
+            // 不再强制将continuous类型转换为fixed类型
             if (this.jointType === v) return;
             this._jointType = v;
             this.matrixWorldNeedsUpdate = true;
@@ -127,7 +127,6 @@
                     break;
 
             }
-
         }
 
         get angle() {
@@ -591,7 +590,7 @@
 
                     } else {
 
-                        throw new Error(`URDFLoader: Failed to load url '${urdfPath}' with error code ${res.status} : ${res.statusText}.`);
+                        throw new Error(`URDFLoader: Failed to load url '${ urdfPath }' with error code ${ res.status } : ${ res.statusText }.`);
 
                     }
 
@@ -672,7 +671,7 @@
 
                     } else {
 
-                        console.error(`URDFLoader : ${targetPkg} not found in provided package list.`);
+                        console.error(`URDFLoader : ${ targetPkg } not found in provided package list.`);
                         return null;
 
                     }
@@ -687,17 +686,17 @@
                 let children;
                 if (data instanceof Document) {
 
-                    children = [...data.children];
+                    children = [ ...data.children ];
 
                 } else if (data instanceof Element) {
 
-                    children = [data];
+                    children = [ data ];
 
                 } else {
 
                     const parser = new DOMParser();
                     const urdf = parser.parseFromString(data, 'text/xml');
-                    children = [...urdf.children];
+                    children = [ ...urdf.children ];
 
                 }
 
@@ -709,7 +708,7 @@
             // Process the <robot> node
             function processRobot(robot) {
 
-                const robotNodes = [...robot.children];
+                const robotNodes = [ ...robot.children ];
                 const links = robotNodes.filter(c => c.nodeName.toLowerCase() === 'link');
                 const joints = robotNodes.filter(c => c.nodeName.toLowerCase() === 'joint');
                 const materials = robotNodes.filter(c => c.nodeName.toLowerCase() === 'material');
@@ -732,7 +731,7 @@
                 links.forEach(l => {
 
                     const name = l.getAttribute('name');
-                    const isRoot = robot.querySelector(`child[link="${name}"]`) === null;
+                    const isRoot = robot.querySelector(`child[link="${ name }"]`) === null;
                     linkMap[name] = processLink(l, visualMap, colliderMap, isRoot ? obj : null);
 
                 });
@@ -800,8 +799,20 @@
             // Process joint nodes and parent them
             function processJoint(joint) {
 
-                const children = [...joint.children];
+                const children = [ ...joint.children ];
                 let jointType = joint.getAttribute('type');
+                
+                // 检查prismatic关节的范围，如果范围小于等于0.15，则转换为fixed类型
+                if (jointType === 'prismatic') {
+                    const limitNode = children.find(n => n.nodeName.toLowerCase() === 'limit');
+                    if (limitNode) {
+                        const lower = parseFloat(limitNode.getAttribute('lower') || 0);
+                        const upper = parseFloat(limitNode.getAttribute('upper') || 0);
+                        if (upper - lower <= 0.15) {
+                            jointType = 'fixed';
+                        }
+                    }
+                }
 
                 let obj;
 
@@ -884,7 +895,7 @@
 
                 }
 
-                const children = [...link.children];
+                const children = [ ...link.children ];
                 target.name = link.getAttribute('name');
                 target.urdfName = target.name;
                 target.urdfNode = link;
@@ -937,7 +948,7 @@
 
             function processMaterial(node) {
 
-                const matNodes = [...node.children];
+                const matNodes = [ ...node.children ];
                 const material = new THREE__namespace.MeshPhongMaterial();
 
                 material.name = node.getAttribute('name') || '';
@@ -982,7 +993,7 @@
             function processLinkElement(vn, materialMap = {}) {
 
                 const isCollisionNode = vn.nodeName.toLowerCase() === 'collision';
-                const children = [...vn.children];
+                const children = [ ...vn.children ];
                 let material = null;
 
                 // get the material first
@@ -1134,7 +1145,7 @@
 
             } else {
 
-                console.warn(`URDFLoader: Could not load model at ${path}.\nNo loader available`);
+                console.warn(`URDFLoader: Could not load model at ${ path }.\nNo loader available`);
 
             }
 

@@ -305,11 +305,8 @@ function extractJointData(viewer) {
         // 获取关节类型
         const jointType = joint.jointType;
         
-        // 如果仍然有continuous类型，在UI层面强制转换为fixed
+        // 保持continuous类型不变，允许其在UI层面显示
         let displayJointType = jointType;
-        if (displayJointType === 'continuous') {
-            displayJointType = 'fixed';
-        }
         
         // 检查prismatic关节的范围，如果范围小于等于0.15，在UI层面强制转换为fixed
         if (displayJointType === 'prismatic') {

@@ -39,14 +39,8 @@ class URDFManipulator extends URDFViewer {
             });
 
         const isJoint = j => {
-
-            // 将continuous类型视为fixed类型，不允许操作
-            if (j.isURDFJoint && j.jointType === 'continuous') {
-                return false;
-            }
-
+            // 允许continuous类型关节可以操作
             return j.isURDFJoint && j.jointType !== 'fixed';
-
         };
 
         // Highlight the link geometry under a joint
@@ -163,11 +157,6 @@ class URDFManipulator extends URDFViewer {
         if (!joint) return null;
         
         let jointType = joint.jointType;
-        
-        // 将continuous类型视为fixed类型
-        if (jointType === 'continuous') {
-            jointType = 'fixed';
-        }
         
         // 将小范围prismatic关节视为fixed类型
         if (jointType === 'prismatic') {

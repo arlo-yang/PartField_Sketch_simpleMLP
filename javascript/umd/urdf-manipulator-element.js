@@ -1,11 +1,10 @@
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('three'), require('./urdf-viewer-element.js')) :
-        typeof define === 'function' && define.amd ? define(['three', './urdf-viewer-element'], factory) :
-            (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.URDFManipulator = factory(global.THREE, global.URDFViewer));
-})(this, (function (THREE, URDFViewer) {
-    'use strict';
+    typeof define === 'function' && define.amd ? define(['three', './urdf-viewer-element'], factory) :
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.URDFManipulator = factory(global.THREE, global.URDFViewer));
+})(this, (function (THREE, URDFViewer) { 'use strict';
 
-    function _interopDefaultLegacy(e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+    function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
     function _interopNamespace(e) {
         if (e && e.__esModule) return e;
@@ -30,6 +29,7 @@
 
     // Find the nearest parent that is a joint
     function isJoint(j) {
+        // 允许continuous类型关节可以操作
         return j.isURDFJoint && j.jointType !== 'fixed';
     };
 
@@ -97,7 +97,7 @@
                 const hit = intersections[0];
                 this.hitDistance = hit.distance;
                 const nearestJoint = findNearestJoint(hit.object);
-
+                
                 // 只有可拖动的关节才能被悬停
                 if (nearestJoint && this._isJointDraggable(nearestJoint)) {
                     hoveredJoint = nearestJoint;
@@ -255,9 +255,23 @@
         // 检查关节是否可拖动
         _isJointDraggable(joint) {
             if (!joint) return false;
-
-            // 只有revolute、continuous和prismatic类型的关节可以拖动
-            return joint.jointType === 'revolute' || joint.jointType === 'continuous' || joint.jointType === 'prismatic';
+            
+            // 获取关节类型
+            let jointType = joint.jointType;
+            
+            // 允许continuous类型关节可以拖动
+            
+            // 将小范围prismatic关节视为fixed类型
+            if (jointType === 'prismatic') {
+                const lower = joint.limit?.lower !== undefined ? joint.limit.lower : 0;
+                const upper = joint.limit?.upper !== undefined ? joint.limit.upper : 0;
+                if (upper - lower <= 0.15) {
+                    return false;
+                }
+            }
+            
+            // 允许revolute、continuous和prismatic类型的关节可以拖动
+            return jointType === 'revolute' || jointType === 'continuous' || jointType === 'prismatic';
         }
 
     }
@@ -403,6 +417,7 @@
                 });
 
             const isJoint = j => {
+                // 允许continuous类型关节可以操作
                 return j.isURDFJoint && j.jointType !== 'fixed';
             };
 
@@ -518,7 +533,19 @@
         getJointType(jointName) {
             const joint = this.robot.joints[jointName];
             if (!joint) return null;
-            return joint.jointType;
+            
+            let jointType = joint.jointType;
+            
+            // 将小范围prismatic关节视为fixed类型
+            if (jointType === 'prismatic') {
+                const lower = joint.limit?.lower !== undefined ? joint.limit.lower : 0;
+                const upper = joint.limit?.upper !== undefined ? joint.limit.upper : 0;
+                if (upper - lower <= 0.15) {
+                    jointType = 'fixed';
+                }
+            }
+            
+            return jointType;
         }
 
     };

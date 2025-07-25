@@ -76,15 +76,7 @@ class URDFJoint extends URDFBase {
     }
 
     set jointType(v) {
-
-        // 强制将continuous类型转换为fixed类型
-        if (v === 'continuous') {
-            v = 'fixed';
-        }
-        
-        // 注意：小范围prismatic关节的转换已在URDFLoader.js中处理
-        // 这里不需要再次检查prismatic关节的范围
-
+        // 不再强制将continuous类型转换为fixed类型
         if (this.jointType === v) return;
         this._jointType = v;
         this.matrixWorldNeedsUpdate = true;
@@ -111,7 +103,6 @@ class URDFJoint extends URDFBase {
                 break;
 
         }
-
     }
 
     get angle() {

@@ -12,12 +12,12 @@ data_small/img/*
 data_small/urdf/*
 data_small/result/*
 z_face_average/greenred/*
-
+data_small_copy/*
 # demo 生成的输出
 /singapo/demo/demo_output/*
 !/singapo/demo/demo_output/pred_graph.json
 !/singapo/demo/demo_output/pred_graph.png
-
+PartField_Sketch_simpleMLP/data_small/result_copy
 # 预训练模型
 /singapo/pretrained/*
 !/singapo/pretrained/.gitkeep

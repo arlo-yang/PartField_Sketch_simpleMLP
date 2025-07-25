@@ -317,11 +317,6 @@ class URDFLoader {
             const children = [ ...joint.children ];
             let jointType = joint.getAttribute('type');
             
-            // 强制将continuous类型转换为fixed类型
-            if (jointType === 'continuous') {
-                jointType = 'fixed';
-            }
-            
             // 检查prismatic关节的范围，如果范围小于等于0.15，则转换为fixed类型
             if (jointType === 'prismatic') {
                 const limitNode = children.find(n => n.nodeName.toLowerCase() === 'limit');

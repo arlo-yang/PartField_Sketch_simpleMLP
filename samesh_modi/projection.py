@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
-# ------------------------------------------------------------------------------
-#                                  Imports
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                                  Imports 
+# ------------------------------------------------------------------------------ 
 import os, sys, re, glob, math, copy, shutil, json, multiprocessing as mp
 from pathlib import Path
 from collections import defaultdict, Counter
@@ -21,7 +20,7 @@ from natsort import natsorted
 import matplotlib.pyplot as plt
 import inspect
 
-# project-internal
+# project‑internal
 from samesh.data.loaders import remove_texture, read_mesh
 from samesh.data.common import NumpyTensor
 from samesh.renderer.renderer import Renderer, render_multiview, colormap_faces, colormap_norms
@@ -29,11 +28,9 @@ from samesh.utils.cameras import *
 from samesh.utils.mesh import duplicate_verts
 
 
-import math
-
-# ------------------------------------------------------------------------------
-#                                视角定义
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                                视角定义 
+# ------------------------------------------------------------------------------ 
 distance = 2.5
 VIEW_POSITIONS = {
     "top-left": {
@@ -103,19 +100,21 @@ VIEW_POSITIONS = {
         "up": [0.0, 1.0, 0.0]
     }
 } 
-# ------------------------------------------------------------------------------
-#                               固定路径配置
-# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------ 
+#                               固定路径配置 
+# ------------------------------------------------------------------------------ 
 PREDICT_DIR = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/img_pred"
+NPY_DIR     = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/npy"
 URDF_DIR    = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf"
 RESULT_DIR  = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/result"
 FAILURE_DIR = os.path.join(RESULT_DIR, "failure")
 CONFIG_FILE = Path(__file__).resolve().parent / "configs" / "mesh_segmentation.yaml"
 
 
-# ------------------------------------------------------------------------------
-#                       预测文件名解析正则 + 工具函数
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                       预测文件名解析正则 + 工具函数 
+# ------------------------------------------------------------------------------ 
 _PREDICT_RE = re.compile(
     r"""^(?P<class>.+?)_(?P<id>\d+)_segmentation_(?P<view>.+?)_joint_(?P<joint>\d+)\.png$""",
     re.IGNORECASE
@@ -342,9 +341,9 @@ def custom_look_at(eye, target, up):
     translation = np.identity(4, dtype=np.float32); translation[:3, 3] = -eye
     return np.linalg.inv(np.matmul(rotation, translation))
 
-# ------------------------------------------------------------------------------
-#                      SegmentationModelMesh  (含补丁)
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                      SegmentationModelMesh  (含补丁) 
+# ------------------------------------------------------------------------------ 
 class SegmentationModelMesh(nn.Module):
     def __init__(self, config: OmegaConf, device='cuda', use_segmentation=True):
         super().__init__()
@@ -356,8 +355,10 @@ class SegmentationModelMesh(nn.Module):
         self.mask_statistics = {}
         self.custom_camera = None
         self.current_predict_path: str | None = None          # NEW
+        self.current_confidence_path: str | None = None       # NEW
+        self.face_confidence: dict[int, float] = {}           # NEW
 
-    # ------------------------------- setters ----------------------------------
+    # ------------------------------- setters ---------------------------------- 
     def set_camera_position(self, camera_info):
         if not isinstance(camera_info, dict):
             raise TypeError(f"camera_info must be a dict, got {type(camera_info)}")
@@ -366,7 +367,7 @@ class SegmentationModelMesh(nn.Module):
             raise ValueError(f"camera_info missing keys {required}, got {camera_info.keys()}")
         self.custom_camera = camera_info
 
-    # ------------------------------ loading -----------------------------------
+    # ------------------------------ loading ----------------------------------- 
     def load(self, scene: Scene, mesh_graph=False):
         self.renderer.set_object(scene); self.renderer.set_camera()
         if isinstance(scene, (Path, str)):
@@ -374,7 +375,7 @@ class SegmentationModelMesh(nn.Module):
         elif hasattr(scene, 'path'):
             self.model_id = Path(scene.path).stem
 
-    # ------------------------------ rendering ---------------------------------
+    # ------------------------------ rendering --------------------------------- 
     def render(self, scene: Scene, visualize_path=None, view_name=None) -> dict[str, NumpyTensor]:
         self.scene_path = getattr(scene, 'path', None)
         if not getattr(self, 'model_id', None):
@@ -413,7 +414,7 @@ class SegmentationModelMesh(nn.Module):
         renders['cmasks'] = [cmask]
         return renders
 
-    # ------------------------------ lifting -----------------------------------
+    # ------------------------------ lifting ----------------------------------- 
     def lift(self, renders: dict[str, NumpyTensor]) -> dict:
         be, en = 0, len(renders['faces'])
         renders = {k: [v[i] for i in range(be, en) if len(v)] for k, v in renders.items()}
@@ -466,9 +467,34 @@ class SegmentationModelMesh(nn.Module):
                 gt_faces_count += 1
         print(f'After voting: {gt_faces_count} faces classified as GT '
               f'({gt_faces_count/total_faces*100:.2f}% of total faces)')
+
+        # ------------------------------------------------------------------ 
+        #               NEW: compute average confidence per face
+        # ------------------------------------------------------------------ 
+        self.face_confidence = {}
+        if self.current_confidence_path and os.path.exists(self.current_confidence_path):
+            try:
+                conf_map = np.load(self.current_confidence_path)  # (H, W) float32
+                # 对于 conf_map 尺寸不匹配进行检查
+                if conf_map.shape != faceid.shape:
+                    raise ValueError(f"Confidence map shape {conf_map.shape} "
+                                     f"does not match face id map shape {faceid.shape}")
+                visibility_mask = norms_mask(norms, pose) & (faceid != -1)
+                for face in range(total_faces):
+                    pix_mask = (faceid == face) & visibility_mask
+                    if np.any(pix_mask):
+                        self.face_confidence[face] = float(conf_map[pix_mask].mean())
+                    else:
+                        self.face_confidence[face] = 0.01  # 将0改为0.01作为默认值
+                print(f'Computed confidence for {len(self.face_confidence)} faces')
+            except Exception as e:
+                print(f'⚠ Failed to compute face confidence: {e}')
+        else:
+            print('⚠ Confidence path not set or file not found; skipping face confidence computation')
+
         return face2label_final
 
-    # ------------------------------- forward ----------------------------------
+    # ------------------------------- forward ---------------------------------- 
     def forward(self, scene: Scene, visualize_path=None, target_labels=None, view_name=None):
         self.load(scene)
         renders = self.render(scene, visualize_path=None, view_name=view_name)
@@ -478,7 +504,7 @@ class SegmentationModelMesh(nn.Module):
         assert self.renderer.tmesh.faces.shape[0] == len(face2label_consistent)
         return face2label_consistent, self.renderer.tmesh
 
-    # ------------------ call_segmentation (patched) ---------------------------
+    # ------------------ call_segmentation (patched) --------------------------- 
     def call_segmentation(self, image: Image, mask: NumpyTensor['h w'], view_index=None):
         """若 self.current_predict_path 存在则直接读取 PNG"""
         if self.current_predict_path and os.path.exists(self.current_predict_path):
@@ -505,9 +531,9 @@ class SegmentationModelMesh(nn.Module):
         fg_mask = (gt_array > 127); bg_mask = (gt_array <= 127)
         return np.array([fg_mask, bg_mask], dtype=bool)
 
-# ------------------------------------------------------------------------------
-#                                 其他工具函数
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                                 其他工具函数 
+# ------------------------------------------------------------------------------ 
 def read_camera_position(model_id: str, render_type: str='arrow-sketch', view_name: str=None) -> dict:
     if view_name and view_name in VIEW_POSITIONS:
         print(f"Using predefined view {view_name}")
@@ -528,13 +554,14 @@ def read_camera_position(model_id: str, render_type: str='arrow-sketch', view_na
         print(f"Error reading camera file: {e}")
     return VIEW_POSITIONS['center']
 
-# ------------------------------------------------------------------------------
-#                       单模型入口 segment_mesh
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                       单模型入口 segment_mesh 
+# ------------------------------------------------------------------------------ 
 def segment_mesh(
     filename: Path | str,
     config: OmegaConf,
     predict_image_path: str,
+    confidence_path: str,            # NEW
     visualize: bool=False,
     extension: str='glb',
     target_labels=None,
@@ -550,6 +577,7 @@ def segment_mesh(
     model = SegmentationModelMesh(config)
     model.model_id = filename.stem  # 仍需保留model_id以便内部逻辑工作
     model.current_predict_path = predict_image_path
+    model.current_confidence_path = confidence_path   # NEW
 
     camera_info = read_camera_position(model.model_id, view_name=view_name)
 
@@ -576,6 +604,18 @@ def segment_mesh(
         for fid, lbl in faces2label.items():
             if lbl == 1:
                 f.write(f"{fid}\n")
+
+    # 保存面片置信度到文本文件
+    if model.face_confidence:
+        with open(f"{output_base}/pred_face_confidence.txt", "w") as f:
+            for fid, conf in sorted(model.face_confidence.items()):
+                # 如果置信度为0，输出0.01
+                output_conf = max(conf, 0.01)
+                f.write(f"{fid} {output_conf:.6f}\n")
+        print(f"[segment_mesh] Face confidence written to pred_face_confidence.txt")
+    else:
+        print(f"[segment_mesh] No face confidence available")
+
                 
     # 如果启用了可视化，确保生成可视化结果
     if visualize:
@@ -588,9 +628,9 @@ def segment_mesh(
 
     return tmesh
 
-# ------------------------------------------------------------------------------
-#                             批量驱动函数
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                             批量驱动函数 
+# ------------------------------------------------------------------------------ 
 def _process_all():
     if not Path(CONFIG_FILE).exists():
         raise FileNotFoundError(f"Config not found: {CONFIG_FILE}")
@@ -607,6 +647,13 @@ def _process_all():
     for idx, png in enumerate(pngs, 1):
         cls, mid, view_raw, joint_idx = parse_predict_filename(png)
         view_key = view_raw.replace("_", "-")
+        
+        # 对应的 NPY 置信度文件路径
+        base_name = f"{cls}_{mid}_segmentation_{view_raw}_joint_{joint_idx}"
+        npy_path = os.path.join(NPY_DIR, f"{base_name}.npy")
+        if not os.path.exists(npy_path):
+            print(f"❌ Confidence npy missing: {npy_path}")
+            continue
         
         # 修改几何体路径格式
         mesh_path = Path(URDF_DIR) / mid / "yy_merged.obj"
@@ -626,7 +673,7 @@ def _process_all():
         print(f"[{idx}/{len(pngs)}] ID={mid} view={view_raw} joint={joint_idx}")
         try:
             # 执行分割
-            segment_mesh(mesh_path, cfg, png,
+            segment_mesh(mesh_path, cfg, png, npy_path,
                      visualize=True, texture=False, view_name=view_key)
                 
             # 复制输入的预测图片到结果目录
@@ -647,8 +694,8 @@ def _process_all():
                 print(f"   ⚠ copy to failure failed: {ee}")
             continue
 
-# ------------------------------------------------------------------------------
-#                               main 入口
-# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------ 
+#                               main 入口 
+# ------------------------------------------------------------------------------ 
 if __name__ == "__main__":
     _process_all()
