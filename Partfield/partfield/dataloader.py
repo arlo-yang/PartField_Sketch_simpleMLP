@@ -118,12 +118,12 @@ class Demo_Dataset(torch.utils.data.Dataset):
             ply_file_read = os.path.join(self.data_path, ply_file)
             pc = self.load_ply_to_numpy(ply_file_read)
 
-            # 标准化点云 - 已注释掉以保持原始大小
-            # bbmin = pc.min(0)
-            # bbmax = pc.max(0)
-            # center = (bbmin + bbmax) * 0.5
-            # scale = 2.0 * 0.9 / (bbmax - bbmin).max()
-            # pc = (pc - center) * scale
+            # 恢复标准化点云 - 确保与训练时一致
+            bbmin = pc.min(0)
+            bbmax = pc.max(0)
+            center = (bbmin + bbmax) * 0.5
+            scale = 2.0 * 0.9 / (bbmax - bbmin).max()
+            pc = (pc - center) * scale
 
         else:
             obj_path = os.path.join(self.data_path, ply_file)
@@ -131,15 +131,14 @@ class Demo_Dataset(torch.utils.data.Dataset):
             vertices = mesh.vertices
             faces = mesh.faces
 
-            # 标准化网格 - 已注释掉以保持模型原始大小
-            # bbmin = vertices.min(0)
-            # bbmax = vertices.max(0)
-            # center = (bbmin + bbmax) * 0.5
-            # scale = 2.0 * 0.9 / (bbmax - bbmin).max()
-            # vertices = (vertices - center) * scale
-            # mesh.vertices = vertices
+            # 恢复标准化网格 - 确保与训练时一致
+            bbmin = vertices.min(0)
+            bbmax = vertices.max(0)
+            center = (bbmin + bbmax) * 0.5
+            scale = 2.0 * 0.9 / (bbmax - bbmin).max()
+            vertices = (vertices - center) * scale
+            mesh.vertices = vertices
 
-            ### Make sure it is a triangle mesh -- just convert the quad
             mesh.faces = quad_to_triangle_mesh(faces)
 
             print("before preprocessing...")

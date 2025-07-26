@@ -25,13 +25,14 @@ class CustomWholeObjDataset(Demo_Dataset):
     """
     自定义数据集，继承自Demo_Dataset，专门处理URDF目录结构
     只加载每个ID文件夹中的yy_merged.obj文件
+    恢复标准化以保证模型预测性能
     """
     def __init__(self, cfg):
         # 不直接调用父类的__init__，因为我们需要自定义数据加载逻辑
         torch.utils.data.Dataset.__init__(self)
         
         # 确保使用正确的数据路径
-        self.data_path = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified"  # 直接硬编码URDF路径
+        self.data_path = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf"  # 直接硬编码URDF路径
         print(f"使用数据路径: {self.data_path}")
         
         self.is_pc = False  # 我们处理的是网格数据
@@ -52,7 +53,7 @@ class CustomWholeObjDataset(Demo_Dataset):
         print(f"找到 {len(self.data_list)} 个有效ID文件夹，每个包含yy_merged.obj文件")
     
     def get_model(self, model_id):
-        """重写get_model方法，直接使用ID而不是文件名"""
+        """重写get_model方法，直接使用ID而不是文件名，并恢复标准化"""
         # 构建yy_merged.obj文件路径
         obj_path = os.path.join(self.data_path, model_id, "yy_merged.obj")
         
@@ -62,13 +63,23 @@ class CustomWholeObjDataset(Demo_Dataset):
         vertices = mesh.vertices
         faces = mesh.faces
         
-        # 标准化网格 - 已注释掉以保持模型原始大小
-        # bbmin = vertices.min(0)
-        # bbmax = vertices.max(0)
-        # center = (bbmin + bbmax) * 0.5
-        # scale = 2.0 * 0.9 / (bbmax - bbmin).max()
-        # vertices = (vertices - center) * scale
-        # mesh.vertices = vertices
+        # ============ 恢复标准化处理 ============
+        # 保存原始的几何信息，用于后续逆变换
+        bbmin = vertices.min(0)
+        bbmax = vertices.max(0)
+        center = (bbmin + bbmax) * 0.5
+        scale = 2.0 * 0.9 / (bbmax - bbmin).max()
+        
+        # 应用标准化变换
+        vertices = (vertices - center) * scale
+        mesh.vertices = vertices
+        
+        # 保存变换参数到mesh对象，供后续使用
+        mesh.original_center = center
+        mesh.original_scale = scale
+        mesh.original_bbmin = bbmin
+        mesh.original_bbmax = bbmax
+        # ========================================
         
         # 确保是三角形网格
         from partfield.dataloader import quad_to_triangle_mesh
@@ -82,6 +93,12 @@ class CustomWholeObjDataset(Demo_Dataset):
         result['pc'] = torch.tensor(pc, dtype=torch.float32)
         result['vertices'] = mesh.vertices
         result['faces'] = mesh.faces
+        
+        # 传递变换参数 - 使用张量格式避免分布式问题
+        result['transform_center'] = torch.tensor(center, dtype=torch.float32)
+        result['transform_scale'] = torch.tensor(scale, dtype=torch.float32)
+        result['transform_bbmin'] = torch.tensor(bbmin, dtype=torch.float32)
+        result['transform_bbmax'] = torch.tensor(bbmax, dtype=torch.float32)
         
         return result
     
@@ -198,12 +215,22 @@ def predict(cfg):
         
         @torch.no_grad()
         def predict_step(self, batch, batch_idx):
-            """重写predict_step方法，修改输出路径和文件命名"""
+            """重写predict_step方法，修改输出路径和文件命名，并添加逆变换功能"""
             # 获取模型ID
             model_id = batch['uid'][0]
             
+            # 获取变换参数 - 从张量格式重建
+            transform_info = None
+            if 'transform_center' in batch:
+                transform_info = {
+                    'center': batch['transform_center'][0].cpu().numpy(),
+                    'scale': batch['transform_scale'][0].cpu().numpy().item(),
+                    'bbmin': batch['transform_bbmin'][0].cpu().numpy(),
+                    'bbmax': batch['transform_bbmax'][0].cpu().numpy()
+                }
+            
             # 创建输出目录
-            output_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified", model_id, "feature")
+            output_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature")
             os.makedirs(output_dir, exist_ok=True)
             
             # 检查是否已经处理过
@@ -214,6 +241,9 @@ def predict(cfg):
             # 记录开始时间
             start_time = time.time()
             
+            print(f"处理模型 {model_id}")
+            if transform_info:
+                print(f"变换参数 - 中心: {transform_info['center']}, 缩放: {transform_info['scale']}")
 
             # 调用原始predict_step的核心逻辑
             # 使用PVCNN提取点云特征
@@ -289,8 +319,21 @@ def predict(cfg):
                 # 合并所有批次的结果
                 return torch.cat(all_sample, dim=1)
             
+            def inverse_transform_vertices(vertices, transform_info):
+                """将标准化的顶点坐标逆变换回原始坐标系"""
+                if transform_info is None:
+                    return vertices
+                
+                # 逆变换: 先除以缩放因子，再加上中心偏移
+                center = np.array(transform_info['center'])
+                scale = transform_info['scale']
+                
+                # 逆变换公式: original = normalized / scale + center
+                original_vertices = vertices / scale + center
+                return original_vertices
+            
             # 保存原始网格信息，用于后续比较
-            original_mesh_path = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf_simpified", model_id, "yy_merged.obj")
+            original_mesh_path = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "yy_merged.obj")
             from partfield.utils import load_mesh_util
             original_mesh = load_mesh_util(original_mesh_path)
             # 确保是三角形网格
@@ -324,17 +367,37 @@ def predict(cfg):
             data_reduced = (data_reduced - data_reduced.min()) / (data_reduced.max() - data_reduced.min())
             colors_255 = (data_reduced * 255).astype(np.uint8)
             
-            # 获取网格顶点和面
-            V = batch['vertices'][0].cpu().numpy()
+            # ============ 关键修改：使用原始坐标系的顶点 ============
+            # 获取标准化后的网格顶点和面（用于特征提取）
+            V_normalized = batch['vertices'][0].cpu().numpy()
             F = batch['faces'][0].cpu().numpy()
             
-            # 创建着色网格
-            colored_mesh = trimesh.Trimesh(vertices=V, faces=F, face_colors=colors_255, process=False)
+            # 将顶点逆变换回原始坐标系（用于可视化和保存）
+            V_original = inverse_transform_vertices(V_normalized, transform_info)
+            
+            # 创建着色网格 - 使用原始坐标系的顶点
+            colored_mesh = trimesh.Trimesh(vertices=V_original, faces=F, face_colors=colors_255, process=False)
             
             # 导出彩色网格
             ply_path = os.path.join(output_dir, f"{model_id}.ply")
             colored_mesh.export(ply_path)
             print(f"保存可视化到 {ply_path}")
+            
+            # 保存变换参数信息
+            if transform_info:
+                transform_path = os.path.join(output_dir, f"{model_id}_transform_info.json")
+                import json
+                with open(transform_path, 'w') as f:
+                    # 将numpy数组转换为列表以便JSON序列化
+                    transform_data = {
+                        'center': transform_info['center'].tolist(),
+                        'scale': float(transform_info['scale']),
+                        'bbmin': transform_info['bbmin'].tolist(),
+                        'bbmax': transform_info['bbmax'].tolist()
+                    }
+                    json.dump(transform_data, f, indent=2)
+                print(f"保存变换参数到 {transform_path}")
+            # =======================================================
             
             # 比较原始网格和生成的PLY网格的面片顺序
             generated_mesh = trimesh.load(ply_path, force='mesh', process=False)
