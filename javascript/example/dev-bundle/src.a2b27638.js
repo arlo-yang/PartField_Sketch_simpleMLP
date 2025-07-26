@@ -48020,8 +48020,68 @@ var initialModels = exports.initialModels = [{
   "meta": "../../urdf/7128/meta.json",
   "color": "#263238"
 }, {
-  "urdf": "../../urdf/900000/mobility.urdf",
-  "meta": "../../urdf/900000/meta.json",
+  "urdf": "../../urdf/900001/mobility.urdf",
+  "meta": "../../urdf/900001/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900002/mobility.urdf",
+  "meta": "../../urdf/900002/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900003/mobility.urdf",
+  "meta": "../../urdf/900003/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900004/mobility.urdf",
+  "meta": "../../urdf/900004/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900005/mobility.urdf",
+  "meta": "../../urdf/900005/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900006/mobility.urdf",
+  "meta": "../../urdf/900006/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900007/mobility.urdf",
+  "meta": "../../urdf/900007/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900008/mobility.urdf",
+  "meta": "../../urdf/900008/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900009/mobility.urdf",
+  "meta": "../../urdf/900009/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900010/mobility.urdf",
+  "meta": "../../urdf/900010/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900011/mobility.urdf",
+  "meta": "../../urdf/900011/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900012/mobility.urdf",
+  "meta": "../../urdf/900012/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900013/mobility.urdf",
+  "meta": "../../urdf/900013/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900014/mobility.urdf",
+  "meta": "../../urdf/900014/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900015/mobility.urdf",
+  "meta": "../../urdf/900015/meta.json",
+  "color": "#263238"
+}, {
+  "urdf": "../../urdf/900016/mobility.urdf",
+  "meta": "../../urdf/900016/meta.json",
   "color": "#263238"
 }];
 },{}],"../node_modules/three/examples/jsm/loaders/OBJLoader.js":[function(require,module,exports) {
@@ -58176,7 +58236,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "36621" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "44461" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
