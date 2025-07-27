@@ -64,25 +64,5 @@ export const initialModels = [
         "urdf": "../../urdf/900012/mobility.urdf",
         "meta": "../../urdf/900012/meta.json",
         "color": "#263238"
-    },
-    {
-        "urdf": "../../urdf/900013/mobility.urdf",
-        "meta": "../../urdf/900013/meta.json",
-        "color": "#263238"
-    },
-    {
-        "urdf": "../../urdf/900014/mobility.urdf",
-        "meta": "../../urdf/900014/meta.json",
-        "color": "#263238"
-    },
-    {
-        "urdf": "../../urdf/900015/mobility.urdf",
-        "meta": "../../urdf/900015/meta.json",
-        "color": "#263238"
-    },
-    {
-        "urdf": "../../urdf/900016/mobility.urdf",
-        "meta": "../../urdf/900016/meta.json",
-        "color": "#263238"
     }
 ];

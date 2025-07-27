@@ -53,8 +53,8 @@ class Model(pl.LightningModule):
                                       n_hidden_layers=6)   # 隐藏层数量
         
         # 控制是否使用PVCNN点云特征提取器
-        self.use_pvcnn = cfg.use_pvcnnonly
-        self.use_2d_feat = cfg.use_2d_feat
+        self.use_pvcnn = cfg.use_pvcnnonly        # True
+        self.use_2d_feat = cfg.use_2d_feat        # False
         
         # 初始化PVCNN编码器，用于从点云提取三平面特征
         if self.use_pvcnn:

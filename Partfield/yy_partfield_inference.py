@@ -206,7 +206,7 @@ def predict(cfg):
             # 配置数据加载器
             dataloader = DataLoader(dataset,
                                    num_workers=self.cfg.dataset.val_num_workers if hasattr(self.cfg.dataset, 'val_num_workers') else 4,
-                                   batch_size=1,  # 每次处理一个模型
+                                   batch_size=1,
                                    shuffle=False,
                                    pin_memory=True,
                                    drop_last=False)
@@ -230,7 +230,7 @@ def predict(cfg):
                 }
             
             # 创建输出目录
-            output_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature")
+            output_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature", "mesh")
             os.makedirs(output_dir, exist_ok=True)
             
             # 检查是否已经处理过
@@ -367,7 +367,7 @@ def predict(cfg):
             data_reduced = (data_reduced - data_reduced.min()) / (data_reduced.max() - data_reduced.min())
             colors_255 = (data_reduced * 255).astype(np.uint8)
             
-            # ============ 关键修改：使用原始坐标系的顶点 ============
+            # ============ 使用原始坐标系的顶点 ============
             # 获取标准化后的网格顶点和面（用于特征提取）
             V_normalized = batch['vertices'][0].cpu().numpy()
             F = batch['faces'][0].cpu().numpy()
@@ -409,7 +409,6 @@ def predict(cfg):
             
             # 输出总耗时
             print(f"处理 {model_id} 完成，耗时: {time.time() - start_time:.2f}秒")
-            
             return
 
     # 实例化自定义模型
@@ -425,10 +424,8 @@ def main():
     # 解析命令行参数
     parser = default_argument_parser()
     args = parser.parse_args()
-    
     # 设置配置，不冻结以允许后续修改
     cfg = setup(args, freeze=False)
-    
     # 执行推理
     predict(cfg)
     

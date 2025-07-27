@@ -12,39 +12,25 @@ from scipy.spatial import KDTree
 import gc
 from plyfile import PlyData
 
-## For remeshing
 import mesh2sdf
 import tetgen
 import vtk
 import math
 import tempfile
-
-### For mesh processing
 import pymeshlab
 
 from partfield.utils import *
 
-#########################
-## To handle quad inputs
-#########################
+
+
 def quad_to_triangle_mesh(F):
-    """
-    Converts a quad-dominant mesh into a pure triangle mesh by splitting quads into two triangles.
-
-    Parameters:
-        quad_mesh (trimesh.Trimesh): Input mesh with quad faces.
-
-    Returns:
-        trimesh.Trimesh: A new mesh with only triangle faces.
-    """
+    
     faces = F
-
     ### If already a triangle mesh -- skip
     if len(faces[0]) == 3:
         return F
 
     new_faces = []
-
     for face in faces:
         if len(face) == 4:  # Quad face
             # Split into two triangles
@@ -54,9 +40,8 @@ def quad_to_triangle_mesh(F):
             print(f"Warning: Skipping non-triangle/non-quad face {face}")
 
     new_faces = np.array(new_faces)
-
     return new_faces
-#########################
+
 
 class Demo_Dataset(torch.utils.data.Dataset):
     def __init__(self, cfg):
@@ -104,21 +89,16 @@ class Demo_Dataset(torch.utils.data.Dataset):
         # Convert to NumPy array (x, y, z)
         points = np.vstack([vertex_data["x"], vertex_data["y"], vertex_data["z"]]).T
         
-        # 打印一些信息
-        print(f"Loaded {points.shape[0]} points from {filename}")
-        print("First 5 points:\n", points[:5])  # 只打印前5个点
         return points
 
     def get_model(self, ply_file):
 
         uid = ply_file.split(".")[-2].replace("/", "_")
 
-        ####
         if self.is_pc:
             ply_file_read = os.path.join(self.data_path, ply_file)
             pc = self.load_ply_to_numpy(ply_file_read)
 
-            # 恢复标准化点云 - 确保与训练时一致
             bbmin = pc.min(0)
             bbmax = pc.max(0)
             center = (bbmin + bbmax) * 0.5
@@ -131,7 +111,6 @@ class Demo_Dataset(torch.utils.data.Dataset):
             vertices = mesh.vertices
             faces = mesh.faces
 
-            # 恢复标准化网格 - 确保与训练时一致
             bbmin = vertices.min(0)
             bbmax = vertices.max(0)
             center = (bbmin + bbmax) * 0.5
@@ -196,7 +175,7 @@ class Demo_Dataset(torch.utils.data.Dataset):
 
 
 
-###############################
+
 class Demo_Remesh_Dataset(torch.utils.data.Dataset):
     def __init__(self, cfg):
         super().__init__()
@@ -227,7 +206,7 @@ class Demo_Remesh_Dataset(torch.utils.data.Dataset):
 
         uid = ply_file.split(".")[-2]
 
-        ####
+
         obj_path = os.path.join(self.data_path, ply_file)
         mesh =  load_mesh_util(obj_path)
         vertices = mesh.vertices

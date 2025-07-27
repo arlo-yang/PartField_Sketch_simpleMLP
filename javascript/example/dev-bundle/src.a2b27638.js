@@ -48067,22 +48067,6 @@ var initialModels = exports.initialModels = [{
   "urdf": "../../urdf/900012/mobility.urdf",
   "meta": "../../urdf/900012/meta.json",
   "color": "#263238"
-}, {
-  "urdf": "../../urdf/900013/mobility.urdf",
-  "meta": "../../urdf/900013/meta.json",
-  "color": "#263238"
-}, {
-  "urdf": "../../urdf/900014/mobility.urdf",
-  "meta": "../../urdf/900014/meta.json",
-  "color": "#263238"
-}, {
-  "urdf": "../../urdf/900015/mobility.urdf",
-  "meta": "../../urdf/900015/meta.json",
-  "color": "#263238"
-}, {
-  "urdf": "../../urdf/900016/mobility.urdf",
-  "meta": "../../urdf/900016/meta.json",
-  "color": "#263238"
 }];
 },{}],"../node_modules/three/examples/jsm/loaders/OBJLoader.js":[function(require,module,exports) {
 "use strict";
@@ -58236,7 +58220,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "44461" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "35139" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
