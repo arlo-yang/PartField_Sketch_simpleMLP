@@ -27,7 +27,7 @@ import shutil
 import re
 
 # ---------------- 参数配置 ---------------- #
-BASE_DIR       = "/home/ipab-graphics/workplace/PartField_Sketch_mlp"
+BASE_DIR       = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP"
 INPUT_DIR      = os.path.join(BASE_DIR, "data_small/urdf")
 OUTPUT_DIR     = os.path.join(BASE_DIR, "data_small/urdf_shell")
 TMP_DIR        = "/tmp/virtualscanner_tmp"

@@ -62,3 +62,7 @@ ENV/
 *.swo javascript/node_modules/
 data/*
 data_small/*
+
+data_small/urdf_shell/*
+Z_Ori_Dataset/urdf/*
+Z_Ori_Dataset/urdf_copy/*

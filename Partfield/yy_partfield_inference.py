@@ -256,6 +256,43 @@ def predict(cfg):
             # 分离SDF特征和部分特征
             sdf_planes, part_planes = torch.split(planes, [64, planes.shape[2] - 64], dim=2)
             
+            # ============ 保存2D feature maps ============
+            # 创建2D map保存目录
+            map_2d_dir = os.path.join("/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf", model_id, "feature", "2D_map")
+            os.makedirs(map_2d_dir, exist_ok=True)
+            
+            # 检查是否已经保存过feature map
+            feature_map_path = os.path.join(map_2d_dir, f"{model_id}.npy")
+            if not os.path.exists(feature_map_path):
+                # 转换为numpy并保存
+                part_planes_np = part_planes.cpu().numpy()  # [1, 3, 448, 128, 128]
+                np.save(feature_map_path, part_planes_np)
+                print(f"保存2D feature maps到: {feature_map_path}")
+                print(f"Feature maps维度: {part_planes_np.shape}")
+                
+                # 保存feature map说明文件
+                info_path = os.path.join(map_2d_dir, f"{model_id}_info.txt")
+                with open(info_path, 'w') as f:
+                    f.write(f"模型ID: {model_id}\n")
+                    f.write(f"生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"Feature maps维度: {part_planes_np.shape}\n\n")
+                    f.write(f"数据格式:\n")
+                    f.write(f"- 形状: [batch, planes, features, height, width]\n")
+                    f.write(f"- [1, 3, 448, 128, 128]\n")
+                    f.write(f"  - batch=1: 单个模型\n")
+                    f.write(f"  - planes=3: XY、YZ、XZ三个平面\n")
+                    f.write(f"  - features=448: 每个像素的特征维度\n")
+                    f.write(f"  - 128x128: 平面分辨率\n\n")
+                    f.write(f"使用方法:\n")
+                    f.write(f"feature_maps = np.load('{model_id}.npy')\n")
+                    f.write(f"xy_plane = feature_maps[0, 0]  # XY平面 [448, 128, 128]\n")
+                    f.write(f"yz_plane = feature_maps[0, 1]  # YZ平面 [448, 128, 128]\n")
+                    f.write(f"xz_plane = feature_maps[0, 2]  # XZ平面 [448, 128, 128]\n\n")
+                    f.write(f"注意: 所有坐标已标准化到[-1, 1]范围\n")
+            else:
+                print(f"2D feature maps已存在，跳过保存")
+            # =============================================
+            
             # 处理网格数据
             from partfield.model.PVCNN.encoder_pc import sample_triplane_feat
             
