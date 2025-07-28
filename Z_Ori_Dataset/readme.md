@@ -17,3 +17,6 @@ model_ids.txt删除一些文件。
 先路径用urdf，再改成urdf_shell，从而对两种都获得feature
 
 7. 目前都是正确的运行，我们得到了：urdf_original， urdf_shell, urdf_visulaization
+
+8. 运行7_shell_mesh_gt.py我希望能够得到shell mesh的gt但是失败了。这个脚本有问题 可能我的思路也有问题。面片的几何结构
+变化了。似乎点也没有align。不管了时间来不及了，我们先处理original的训练
