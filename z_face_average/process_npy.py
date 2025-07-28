@@ -41,10 +41,10 @@ from sklearn.metrics.pairwise import euclidean_distances
 from tqdm import tqdm
 
 # 全局路径配置
-URDF_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/urdf"
-RESULT_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/result"
-OUTPUT_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/feature_result_npy"
-IMG_DIR = "/hy-tmp/PartField_Sketch_simpleMLP/data_small/img"
+URDF_DIR = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/urdf"
+RESULT_DIR = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/result"
+OUTPUT_DIR = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/feature_result_npy"
+IMG_DIR = "/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small/img_pred"
 
 def parse_result_path(result_path):
     """从结果路径解析信息"""
@@ -116,7 +116,7 @@ def process_single_result(result_path):
     
     # 构建文件路径
     face_ids_path = os.path.join(result_path, "pred_face_ids.txt")
-    npy_path = os.path.join(URDF_DIR, model_id, "feature", f"{model_id}.npy")
+    npy_path = os.path.join(URDF_DIR, model_id, "feature", "mesh", f"{model_id}.npy")
     obj_path = os.path.join(URDF_DIR, model_id, "yy_merged.obj")
     
     # 检查文件是否存在
@@ -218,7 +218,7 @@ def find_all_result_paths():
             # 检查结果目录是否存在
             if os.path.isdir(result_path) and os.path.exists(os.path.join(result_path, "pred_face_ids.txt")):
                 # 检查NPY文件是否存在
-                npy_path = os.path.join(URDF_DIR, model_id, "feature", f"{model_id}.npy")
+                npy_path = os.path.join(URDF_DIR, model_id, "feature", "mesh", f"{model_id}.npy")
                 if os.path.exists(npy_path):
                     result_paths.append(result_path)
     

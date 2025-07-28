@@ -20,3 +20,7 @@ model_ids.txt删除一些文件。
 
 8. 运行7_shell_mesh_gt.py我希望能够得到shell mesh的gt但是失败了。这个脚本有问题 可能我的思路也有问题。面片的几何结构
 变化了。似乎点也没有align。不管了时间来不及了，我们先处理original的训练
+
+9. img_pred，npy应该不需要动 这俩是图片域的,之前通过/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/segmentation2/all_confidence.py生成，是固定的问题不大
+
+10. 可以check一下是不是面片confidence和几何体对应上。不要搞乱了 
