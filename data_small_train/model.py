@@ -17,36 +17,41 @@ import math
 from typing import Optional, Tuple
 
 
-class CompactGroupedEmbedding(nn.Module):
-    """紧凑分组嵌入 - 极致内存高效"""
+class EnhancedGroupedEmbedding(nn.Module):
+    """增强分组嵌入 - 平衡性能与内存"""
     
-    def __init__(self, partfield_dim=448, confidence_dim=1, coord_dim=9, embed_dim=64):
+    def __init__(self, partfield_dim=448, confidence_dim=1, coord_dim=9, embed_dim=256):
         super().__init__()
         
-        # PartField压缩 (448→48维，极致压缩)
+        # PartField增强嵌入 (448→192维，保留更多信息)
         self.partfield_proj = nn.Sequential(
-            nn.Linear(partfield_dim, 96),   # 先降到96
+            nn.Linear(partfield_dim, 384),  # 先扩展
             nn.GELU(),
-            nn.Linear(96, 48),              # 再降到48
-            nn.LayerNorm(48)
+            nn.Dropout(0.1),
+            nn.Linear(384, 192),            # 智能压缩
+            nn.LayerNorm(192),
+            nn.GELU(),
+            nn.Dropout(0.1)
         )
         
-        # Confidence扩展 (1→8维，适度增强)
+        # Confidence增强 (1→32维，充分利用置信度信息)
         self.confidence_proj = nn.Sequential(
-            nn.Linear(confidence_dim, 8),
+            nn.Linear(confidence_dim, 16),
             nn.GELU(),
-            nn.LayerNorm(8)
+            nn.Linear(16, 32),
+            nn.LayerNorm(32)
         )
         
-        # 坐标压缩 (9→8维，保持几何信息)
+        # 坐标增强 (9→32维，保持几何信息)
         self.coord_proj = nn.Sequential(
-            nn.Linear(coord_dim, 8),
+            nn.Linear(coord_dim, 24),
             nn.GELU(),
-            nn.LayerNorm(8)
+            nn.Linear(24, 32),
+            nn.LayerNorm(32)
         )
         
-        # 融合层: 48+8+8=64维
-        assert 48 + 8 + 8 == embed_dim, f"维度必须匹配: {48 + 8 + 8} != {embed_dim}"
+        # 融合层: 192+32+32=256维
+        assert 192 + 32 + 32 == embed_dim, f"维度必须匹配: {192 + 32 + 32} != {embed_dim}"
         
         # 最终融合
         self.fusion = nn.Sequential(
@@ -57,12 +62,12 @@ class CompactGroupedEmbedding(nn.Module):
     
     def forward(self, partfield, confidence, coordinates):
         # 分别嵌入
-        pf_embed = self.partfield_proj(partfield)      # (N, 48)
-        conf_embed = self.confidence_proj(confidence)   # (N, 8)
-        coord_embed = self.coord_proj(coordinates)      # (N, 8)
+        pf_embed = self.partfield_proj(partfield)      # (N, 192)
+        conf_embed = self.confidence_proj(confidence)   # (N, 32)
+        coord_embed = self.coord_proj(coordinates)      # (N, 32)
         
         # 拼接
-        combined = torch.cat([pf_embed, conf_embed, coord_embed], dim=-1)  # (N, 64)
+        combined = torch.cat([pf_embed, conf_embed, coord_embed], dim=-1)  # (N, 256)
         
         # 融合
         enhanced = self.fusion(combined)
@@ -70,37 +75,44 @@ class CompactGroupedEmbedding(nn.Module):
         return enhanced
 
 
-class CompactFourPointGeometricEncoding(nn.Module):
-    """极致紧凑四点几何位置编码"""
+class EnhancedGeometricEncoding(nn.Module):
+    """增强几何位置编码"""
     
-    def __init__(self, embed_dim=64):
+    def __init__(self, embed_dim=256):
         super().__init__()
         
-        # 4个点的位置编码器 (每个点16维)
+        # 4个点的位置编码器 (每个点64维)
         self.point_encoder = nn.Sequential(
-            nn.Linear(3, 16),  # 每个点16维
+            nn.Linear(3, 32),
             nn.GELU(),
-            nn.LayerNorm(16)
+            nn.Linear(32, 64),  # 每个点64维
+            nn.LayerNorm(64)
         )
         
-        # 几何特征融合 (4×16=64维)
+        # 几何特征融合 (4×64=256维)
         self.geometric_fusion = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
-            nn.LayerNorm(embed_dim)
+            nn.Dropout(0.15),
+            nn.Linear(embed_dim, embed_dim),
+            nn.LayerNorm(embed_dim),
+            nn.Dropout(0.1)
         )
         
-        # 形状特征编码器 (面积+法向量→8维)
+        # 形状特征编码器 (面积+法向量→64维)
         self.shape_encoder = nn.Sequential(
-            nn.Linear(4, 8),   # 面积+法向量(3维)=4维→8维
+            nn.Linear(4, 32),   # 面积+法向量(3维)=4维→32维
             nn.GELU(),
-            nn.LayerNorm(8)
+            nn.Linear(32, 64),  # 扩展到64维
+            nn.LayerNorm(64)
         )
         
-        # 最终融合 (64+8→64)
+        # 最终融合 (256+64→256)
         self.final_fusion = nn.Sequential(
-            nn.Linear(embed_dim + 8, embed_dim),
+            nn.Linear(embed_dim + 64, embed_dim * 2),
             nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(embed_dim * 2, embed_dim),
             nn.LayerNorm(embed_dim)
         )
     
@@ -109,7 +121,7 @@ class CompactFourPointGeometricEncoding(nn.Module):
         Args:
             face_coordinates: (N, 9) - 3个顶点的坐标
         Returns:
-            pos_encoding: (N, 64) - 极致紧凑位置编码
+            pos_encoding: (N, 256) - 增强位置编码
         """
         batch_size = face_coordinates.shape[0]
         
@@ -122,14 +134,14 @@ class CompactFourPointGeometricEncoding(nn.Module):
         # 四个点: 3顶点 + 重心
         four_points = torch.cat([vertices, centroid], dim=1)  # (N, 4, 3)
         
-        # 每个点编码16维
+        # 每个点编码64维
         point_encodings = []
         for i in range(4):
-            point_enc = self.point_encoder(four_points[:, i, :])  # (N, 16)
+            point_enc = self.point_encoder(four_points[:, i, :])  # (N, 64)
             point_encodings.append(point_enc)
         
         # 拼接4个点的编码
-        combined_points = torch.cat(point_encodings, dim=-1)  # (N, 64)
+        combined_points = torch.cat(point_encodings, dim=-1)  # (N, 256)
         
         # 几何特征增强
         geo_features = self.geometric_fusion(combined_points)
@@ -146,23 +158,23 @@ class CompactFourPointGeometricEncoding(nn.Module):
         
         # 形状特征
         shape_features = torch.cat([area, normal], dim=-1)  # (N, 4)
-        shape_enc = self.shape_encoder(shape_features)  # (N, 8)
+        shape_enc = self.shape_encoder(shape_features)  # (N, 64)
         
         # 最终融合
-        final_encoding = torch.cat([geo_features, shape_enc], dim=-1)  # (N, 72)
-        pos_encoding = self.final_fusion(final_encoding)  # (N, 64)
+        final_encoding = torch.cat([geo_features, shape_enc], dim=-1)  # (N, 320)
+        pos_encoding = self.final_fusion(final_encoding)  # (N, 256)
         
         return pos_encoding
 
 
-class HierarchicalAttention(nn.Module):
-    """极致内存高效分层注意力"""
+class MemoryEfficientAttention(nn.Module):
+    """内存高效注意力机制"""
     
-    def __init__(self, embed_dim=64, num_heads=4, chunk_size=512):
+    def __init__(self, embed_dim=256, num_heads=8, chunk_size=256):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
-        self.chunk_size = chunk_size  # 更小的分块，避免内存爆炸
+        self.chunk_size = chunk_size  # 智能分块大小
         
         # 局部注意力 (在chunk内)
         self.local_attention = nn.MultiheadAttention(
@@ -186,15 +198,17 @@ class HierarchicalAttention(nn.Module):
         self.norm3 = nn.LayerNorm(embed_dim)
         
         self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),      # 不扩展，极致节省内存
+            nn.Linear(embed_dim, embed_dim * 4),  # 标准扩展4倍
             nn.GELU(),
+            nn.Dropout(0.15),  # 增强dropout
+            nn.Linear(embed_dim * 4, embed_dim),
             nn.Dropout(0.1)
         )
     
     def forward(self, x, confidence):
         """
         Args:
-            x: (N, 64) 面片特征，N可能是40,000+
+            x: (N, 256) 面片特征，N可能是40,000+
             confidence: (N, 1) 置信度
         """
         N = x.shape[0]
@@ -257,10 +271,10 @@ class MemoryEfficientSOTAModel(nn.Module):
     
     def __init__(self, 
                  input_dim=458,
-                 embed_dim=64,       # 极致降维
-                 num_layers=3,       # 进一步减少层数
-                 num_heads=4,        # 减少头数
-                 chunk_size=512,     # 更小分块
+                 embed_dim=256,      # 恢复强表示能力
+                 num_layers=6,       # 增加模型深度
+                 num_heads=8,        # 恢复多头注意力
+                 chunk_size=256,     # 智能分块
                  dropout=0.1,
                  num_classes=2):
         super().__init__()
@@ -268,30 +282,33 @@ class MemoryEfficientSOTAModel(nn.Module):
         self.embed_dim = embed_dim
         self.num_layers = num_layers
         
-        # 紧凑嵌入
-        self.embedding = CompactGroupedEmbedding(
+        # 增强嵌入
+        self.embedding = EnhancedGroupedEmbedding(
             partfield_dim=448, 
             confidence_dim=1, 
             coord_dim=9, 
             embed_dim=embed_dim
         )
         
-        # 紧凑位置编码
-        self.pos_encoding = CompactFourPointGeometricEncoding(embed_dim)
+        # 增强位置编码
+        self.pos_encoding = EnhancedGeometricEncoding(embed_dim)
         
-        # 分层注意力层
+        # 内存高效注意力层
         self.layers = nn.ModuleList([
-            HierarchicalAttention(embed_dim, num_heads, chunk_size)
+            MemoryEfficientAttention(embed_dim, num_heads, chunk_size)
             for _ in range(num_layers)
         ])
         
-        # 极致轻量分类头
+        # 强化分类头
         self.classifier = nn.Sequential(
             nn.LayerNorm(embed_dim),
-            nn.Linear(embed_dim, 32),
+            nn.Linear(embed_dim, 128),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(32, num_classes)
+            nn.Linear(128, 64),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, num_classes)
         )
         
         # 权重初始化
@@ -336,8 +353,8 @@ class MemoryEfficientSOTAModel(nn.Module):
         confidence = features[:, 448:449]
         coordinates = features[:, 449:458]
         
-        # 极致紧凑嵌入 458→64
-        x = self.embedding(partfield, confidence, coordinates)  # (N, 64)
+        # 增强嵌入 458→256
+        x = self.embedding(partfield, confidence, coordinates)  # (N, 256)
         
         # 位置编码
         pos_enc = self.pos_encoding(coordinates)
@@ -436,18 +453,18 @@ def create_model(config=None):
     """创建模型的工厂函数"""
     if config is None:
         config = {
-            'embed_dim': 64,
-            'num_layers': 3,
-            'num_heads': 4,
-            'chunk_size': 512,
+            'embed_dim': 256,
+            'num_layers': 6,
+            'num_heads': 8,
+            'chunk_size': 256,
             'dropout': 0.1
         }
     
     model = MemoryEfficientSOTAModel(
-        embed_dim=config.get('embed_dim', 64),
-        num_layers=config.get('num_layers', 3),
-        num_heads=config.get('num_heads', 4),
-        chunk_size=config.get('chunk_size', 512),
+        embed_dim=config.get('embed_dim', 256),
+        num_layers=config.get('num_layers', 6),
+        num_heads=config.get('num_heads', 8),
+        chunk_size=config.get('chunk_size', 256),
         dropout=config.get('dropout', 0.1)
     )
     

@@ -67,6 +67,16 @@ class Trainer:
         self.best_val_acc = 0.0
         self.best_val_f1 = 0.0
         
+        # 早停机制
+        early_stop_config = self.config['training'].get('early_stopping', {})
+        self.early_stopping = early_stop_config.get('patience', 0) > 0
+        if self.early_stopping:
+            self.early_stop_patience = early_stop_config.get('patience', 15)
+            self.early_stop_min_delta = early_stop_config.get('min_delta', 0.001)
+            self.early_stop_monitor = early_stop_config.get('monitor', 'val_f1')
+            self.early_stop_counter = 0
+            self.early_stop_best_score = -float('inf') if 'f1' in self.early_stop_monitor else float('inf')
+        
         print(f"训练设备: {self.device}")
         print(f"混合精度: {'启用' if self.use_amp else '禁用'}")
         print(f"输出目录: {self.output_dir}")
@@ -186,6 +196,16 @@ class Trainer:
                 self.optimizer,
                 step_size=scheduler_config.get('step_size', 30),
                 gamma=scheduler_config.get('gamma', 0.1)
+            )
+        elif scheduler_type == 'reduce_on_plateau':
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=scheduler_config.get('factor', 0.5),
+                patience=scheduler_config.get('patience', 5),
+                min_lr=scheduler_config.get('min_lr', 1e-6),
+                threshold=scheduler_config.get('threshold', 0.001),
+                verbose=True
             )
         else:
             self.scheduler = None
@@ -380,6 +400,27 @@ class Trainer:
         
         return checkpoint['epoch'], checkpoint['metrics']
     
+    def check_early_stopping(self, current_score):
+        """检查是否需要早停"""
+        if not self.early_stopping:
+            return False
+        
+        if 'f1' in self.early_stop_monitor or 'acc' in self.early_stop_monitor:
+            # 越大越好的指标
+            improved = current_score > self.early_stop_best_score + self.early_stop_min_delta
+        else:
+            # 越小越好的指标（如loss）
+            improved = current_score < self.early_stop_best_score - self.early_stop_min_delta
+        
+        if improved:
+            self.early_stop_best_score = current_score
+            self.early_stop_counter = 0
+            return False
+        else:
+            self.early_stop_counter += 1
+            print(f"早停计数器: {self.early_stop_counter}/{self.early_stop_patience}")
+            return self.early_stop_counter >= self.early_stop_patience
+    
     def train(self):
         """主训练循环"""
         print("开始训练...")
@@ -422,7 +463,10 @@ class Trainer:
             
             # 更新学习率
             if self.scheduler:
-                self.scheduler.step()
+                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(val_metrics['loss'])
+                else:
+                    self.scheduler.step()
             
             # 记录指标
             train_losses.append(train_loss)
@@ -459,6 +503,14 @@ class Trainer:
                 self.best_val_acc = val_metrics['accuracy']
             
             self.save_checkpoint(epoch, metrics, is_best)
+            
+            # 检查早停
+            if self.early_stopping:
+                monitor_value = val_metrics[self.early_stop_monitor.split('_')[1]]  # 提取指标名
+                if self.check_early_stopping(monitor_value):
+                    print(f"\n早停触发！在epoch {epoch+1}停止训练")
+                    print(f"最佳{self.early_stop_monitor}: {self.early_stop_best_score:.4f}")
+                    break
             
             # 绘制训练曲线
             if (epoch + 1) % 5 == 0:
