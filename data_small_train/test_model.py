@@ -51,6 +51,9 @@ class ModelTester:
         # 加载模型
         self.model = self._load_model()
         
+        # 快速测试模型
+        self._quick_model_test()
+        
         # 创建数据集
         self.test_dataset = PartSegmentationDataset(
             data_dir=config['data']['data_dir'],
@@ -71,26 +74,76 @@ class ModelTester:
         """加载训练好的模型"""
         logger.info(f"加载模型: {self.checkpoint_path}")
         
-        # 创建模型
-        model = create_model(self.config['model'])
+        # 创建模型 - 确保使用新的几何感知模型
+        model_config = self.config['model'].copy()
+        model_config['use_simple_model'] = False  # 强制使用新模型
+        
+        # 打印模型配置用于调试
+        logger.info(f"模型配置: {model_config}")
+        
+        model = create_model(model_config)
         model.to(self.device)
         
-        # 加载权重 - 适配新的检查点格式
+        # 加载权重
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
-        if 'model_state_dict' in checkpoint:
-            # 旧格式
-            model.load_state_dict(checkpoint['model_state_dict'])
-        elif 'model' in checkpoint:
-            # 新格式
-            model.load_state_dict(checkpoint['model'])
+        if 'model' in checkpoint:
+            try:
+                model.load_state_dict(checkpoint['model'], strict=True)
+            except RuntimeError as e:
+                logger.error(f"模型权重加载失败: {e}")
+                logger.info("尝试非严格模式加载...")
+                model.load_state_dict(checkpoint['model'], strict=False)
         else:
             # 直接是state_dict
-            model.load_state_dict(checkpoint)
+            try:
+                model.load_state_dict(checkpoint, strict=True)
+            except RuntimeError as e:
+                logger.error(f"模型权重加载失败: {e}")
+                logger.info("尝试非严格模式加载...")
+                model.load_state_dict(checkpoint, strict=False)
         
         model.eval()
         
-        logger.info("模型加载完成")
+        # 验证模型是否正确加载
+        total_params = sum(p.numel() for p in model.parameters())
+        logger.info(f"模型加载完成 - 总参数: {total_params:,}")
+        
+        # 检查是否有权重为零的层（可能表示加载不完整）
+        zero_param_layers = 0
+        for name, param in model.named_parameters():
+            if torch.all(param == 0):
+                zero_param_layers += 1
+                logger.warning(f"发现零权重层: {name}")
+        
+        if zero_param_layers > 0:
+            logger.warning(f"发现 {zero_param_layers} 个零权重层，可能模型加载不完整")
+        else:
+            logger.info("所有参数正常加载")
+        
         return model
+    
+    def _quick_model_test(self):
+        """快速测试模型是否能正常工作"""
+        logger.info("进行快速模型测试...")
+        
+        try:
+            # 创建一个小的测试样本
+            test_features = torch.randn(100, 458).to(self.device)
+            # 清理confidence列
+            test_features[:, 448:449] = torch.clamp(test_features[:, 448:449], 0.0, 1.0)
+            
+            with torch.no_grad():
+                logits = self.model(test_features)
+            
+            assert logits.shape == (100, 2), f"输出形状错误: {logits.shape}"
+            assert not torch.isnan(logits).any(), "输出包含NaN"
+            assert not torch.isinf(logits).any(), "输出包含Inf"
+            
+            logger.info("✅ 模型测试通过")
+            
+        except Exception as e:
+            logger.error(f"❌ 模型测试失败: {e}")
+            raise
     
     @torch.no_grad()
     def evaluate_model(self):
@@ -111,11 +164,11 @@ class ModelTester:
         for features, labels, sample_info in pbar:
             features = features.to(self.device)
             labels = labels.to(self.device)
-            confidence = features[:, 448:449]
             
             # 数值清理（与训练时保持一致）
             features = torch.nan_to_num(features, nan=0.0, posinf=1e4, neginf=-1e4)
-            confidence = torch.clamp(torch.nan_to_num(confidence, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+            # 清理confidence列
+            confidence = torch.clamp(torch.nan_to_num(features[:, 448:449], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
             features[:, 448:449] = confidence
             
             # 前向传播
@@ -348,8 +401,9 @@ class ModelTester:
         features = features.to(self.device)
         labels = labels.to(self.device)
         
-        # 数值清理
+        # 数值清理（与训练时保持一致）
         features = torch.nan_to_num(features, nan=0.0, posinf=1e4, neginf=-1e4)
+        # 清理confidence列
         confidence = torch.clamp(torch.nan_to_num(features[:, 448:449], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
         features[:, 448:449] = confidence
         

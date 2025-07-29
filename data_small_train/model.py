@@ -135,35 +135,50 @@ class ConfidenceGuidedPromptEncoder(nn.Module):
     """
     Confidence引导的Prompt编码器
     类似SAM的prompt机制，让confidence成为强引导信号
+    增强对高置信度区域的关注
     """
     def __init__(self, embed_dim: int = 128, input_feature_dim: int = 96):
         super().__init__()
         self.embed_dim = embed_dim
         self.input_feature_dim = input_feature_dim
         
-        # Confidence编码器
+        # 增强的Confidence编码器 - 提高capacity
         self.conf_encoder = nn.Sequential(
-            nn.Linear(1, 32),
+            nn.Linear(1, 64),  # 增加容量
             nn.GELU(),
-            nn.LayerNorm(32),
-            nn.Linear(32, embed_dim // 4),
+            nn.LayerNorm(64),
+            nn.Linear(64, embed_dim // 2),  # 增加输出维度
             nn.GELU(),
-            nn.LayerNorm(embed_dim // 4)
+            nn.LayerNorm(embed_dim // 2)
         )
         
-        # 高置信度面片提取器 - 修正输入维度
+        # 高置信度面片提取器
         self.high_conf_proj = nn.Sequential(
             nn.Linear(input_feature_dim, embed_dim),
             nn.GELU(),
             nn.LayerNorm(embed_dim)
         )
         
-        # Prompt生成器
-        self.prompt_generator = nn.Sequential(
+        # 分层Prompt生成器 - 针对不同置信度级别
+        self.high_conf_prompt = nn.Sequential(
             nn.Linear(embed_dim, embed_dim),
             nn.GELU(),
             nn.LayerNorm(embed_dim),
             nn.Linear(embed_dim, embed_dim)
+        )
+        
+        self.medium_conf_prompt = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim),
+            nn.Linear(embed_dim, embed_dim)
+        )
+        
+        # Confidence加权融合
+        self.prompt_fusion = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim)
         )
     
     def forward(self, features: torch.Tensor, confidence: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -172,26 +187,48 @@ class ConfidenceGuidedPromptEncoder(nn.Module):
             features: (N, input_feature_dim) 面片特征
             confidence: (N, 1) 置信度
         Returns:
-            conf_features: (N, embed_dim//4) confidence编码特征
+            conf_features: (N, embed_dim//2) confidence编码特征 (增强后维度更大)
             prompt_signal: (embed_dim,) 全局prompt信号
         """
-        # Confidence特征编码
-        conf_features = self.conf_encoder(confidence)  # (N, embed_dim//4)
+        # 增强的Confidence特征编码
+        conf_features = self.conf_encoder(confidence)  # (N, embed_dim//2)
         
-        # 选择高置信度面片生成prompt
+        # 分层处理不同置信度级别
         conf_scores = confidence.squeeze(-1)  # (N,)
-        if conf_scores.max() > 0.1:  # 如果存在较高置信度
-            # 选择top-k高置信度面片
-            k = min(max(1, int(0.1 * len(conf_scores))), 50)  # 取10%或最多50个
-            _, top_indices = torch.topk(conf_scores, k)
-            high_conf_features = features[top_indices]  # (k, embed_dim)
+        
+        # 高置信度面片 (0.98+) - 用户提到有很多0.95+的
+        high_conf_mask = conf_scores >= 0.98
+        # 中等置信度面片 (0.3-0.98)
+        medium_conf_mask = (conf_scores >= 0.5) & (conf_scores < 0.98)
+        
+        prompt_components = []
+        
+        # 处理高置信度区域
+        if high_conf_mask.sum() > 0:
+            high_conf_features = features[high_conf_mask]
+            high_conf_proj = self.high_conf_proj(high_conf_features)
+            high_prompt = self.high_conf_prompt(high_conf_proj.mean(dim=0))
+            prompt_components.append(high_prompt)
             
-            # 生成prompt信号
-            enhanced_features = self.high_conf_proj(high_conf_features)
-            prompt_signal = self.prompt_generator(enhanced_features.mean(dim=0))  # (embed_dim,)
+            print(f"High confidence faces: {high_conf_mask.sum().item()}/{len(conf_scores)} (max conf: {conf_scores.max().item():.3f})")
+        
+        # 处理中等置信度区域
+        if medium_conf_mask.sum() > 0:
+            medium_conf_features = features[medium_conf_mask]
+            medium_conf_proj = self.high_conf_proj(medium_conf_features)  # 复用projection
+            medium_prompt = self.medium_conf_prompt(medium_conf_proj.mean(dim=0))
+            prompt_components.append(medium_prompt)
+        
+        # 如果没有足够的置信度信息，使用全局特征
+        if len(prompt_components) == 0:
+            global_features = self.high_conf_proj(features.mean(dim=0))
+            prompt_signal = self.high_conf_prompt(global_features)
+        elif len(prompt_components) == 1:
+            prompt_signal = prompt_components[0]
         else:
-            # 如果没有高置信度，使用全局平均
-            prompt_signal = self.prompt_generator(features.mean(dim=0))
+            # 融合高置信度和中等置信度的prompt
+            combined = torch.cat(prompt_components, dim=-1)  # (embed_dim * 2,)
+            prompt_signal = self.prompt_fusion(combined)  # (embed_dim,)
         
         return _sanitize_tensor(conf_features), _sanitize_tensor(prompt_signal)
 
@@ -384,9 +421,11 @@ class HierarchicalGeometricAttentionMLP(nn.Module):
         # input_feature_dim = embed_dim//2 + embed_dim//4 = 96
         self.prompt_encoder = ConfidenceGuidedPromptEncoder(embed_dim, input_feature_dim=embed_dim//2 + embed_dim//4)
         
-        # 特征融合层
+        # 特征融合层 - 更新维度适配增强的confidence特征
+        # pf_encoded (embed_dim//2) + geo_features (embed_dim//4) + conf_features (embed_dim//2) = embed_dim * 5/4
+        fusion_input_dim = embed_dim // 2 + embed_dim // 4 + embed_dim // 2  # = embed_dim * 5/4
         self.feature_fusion = nn.Sequential(
-            nn.Linear(embed_dim // 2 + embed_dim // 4 + embed_dim // 4, embed_dim),
+            nn.Linear(fusion_input_dim, embed_dim),
             nn.GELU(),
             RMSNorm(embed_dim),
         )
@@ -474,7 +513,7 @@ class PMA(nn.Module):
     产生少量全局上下文向量（eg. 4/8 个），再进行平均/拼接用于后续 MLP。
     复杂度 O(N * S)，S<<N，内存友好。
     """
-    def __init__(self, dim: int, num_seeds: int = 8, num_heads: int = 4, dropout: float = 0.1):
+    def __init__(self, dim: int, num_seeds: int = 18, num_heads: int = 4, dropout: float = 0.1):
         super().__init__()
         self.seeds = nn.Parameter(torch.randn(num_seeds, dim) / math.sqrt(dim))
         self.norm_q = RMSNorm(dim)
