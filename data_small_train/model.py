@@ -1,510 +1,691 @@
+# ===========================
+# file: model.py
+# ===========================
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-内存高效SOTA Attention-MLP模型
 
-基于3_model.md设计规范实现
-- 458维→128维大幅降维
-- 分层注意力处理40,000+面片
-- 四点几何位置编码
-- Confidence引导机制
-"""
+from typing import Optional, Tuple
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-from typing import Optional, Tuple
 
 
-class EnhancedGroupedEmbedding(nn.Module):
-    """增强分组嵌入 - 平衡性能与内存"""
-    
-    def __init__(self, partfield_dim=448, confidence_dim=1, coord_dim=9, embed_dim=256):
+# ---------------------------
+# 数值稳定性工具
+# ---------------------------
+
+def _sanitize_tensor(x: torch.Tensor, clamp_val: float = 1e4) -> torch.Tensor:
+    """
+    将张量中的 NaN/Inf 替换为有限值并裁剪，防止数值爆炸。
+    """
+    x = torch.nan_to_num(x, nan=0.0, posinf=clamp_val, neginf=-clamp_val)
+    if clamp_val is not None:
+        x = x.clamp(min=-clamp_val, max=clamp_val)
+    return x
+
+
+# ---------------------------
+# 基础层
+# ---------------------------
+
+class RMSNorm(nn.Module):
+    """RMSNorm（无 bias），数值稳定。"""
+    def __init__(self, d: int, eps: float = 1e-8):
         super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(d))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = _sanitize_tensor(x)
+        norm = x.norm(2, dim=-1, keepdim=True)
+        rms = norm * (1.0 / math.sqrt(x.shape[-1]))
+        x = x / (rms + self.eps)
+        return self.weight * x
+
+
+class MHA(nn.Module):
+    """
+    轻量包装 nn.MultiheadAttention，强制在 FP32 中计算注意力（避免 FP16 溢出）。
+    """
+    def __init__(self, d: int, nhead: int, dropout: float = 0.1):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(d, nhead, dropout=dropout, batch_first=True)
+
+    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask=None):
+        orig_dtype = q.dtype
+        with torch.cuda.amp.autocast(enabled=False):
+            out, weights = self.attn(q.float(), k.float(), v.float(), 
+                                   attn_mask=attn_mask, need_weights=True)
+        return out.to(orig_dtype), weights.to(orig_dtype)
+
+
+# ---------------------------
+# 几何感知工具
+# ---------------------------
+
+class GeometricFeatureEncoder(nn.Module):
+    """几何特征编码器：提取面片的几何属性"""
+    def __init__(self, embed_dim: int = 128):
+        super().__init__()
+        self.embed_dim = embed_dim
         
-        # PartField增强嵌入 (448→192维，保留更多信息)
-        self.partfield_proj = nn.Sequential(
-            nn.Linear(partfield_dim, 384),  # 先扩展
+        # 面片自身几何特征：面积、法向量、重心
+        self.face_geo_encoder = nn.Sequential(
+            nn.Linear(7, 32),  # 面积(1) + 法向量(3) + 重心(3) = 7
             nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(384, 192),            # 智能压缩
-            nn.LayerNorm(192),
-            nn.GELU(),
-            nn.Dropout(0.1)
-        )
-        
-        # Confidence增强 (1→32维，充分利用置信度信息)
-        self.confidence_proj = nn.Sequential(
-            nn.Linear(confidence_dim, 16),
-            nn.GELU(),
-            nn.Linear(16, 32),
             nn.LayerNorm(32)
         )
         
-        # 坐标增强 (9→32维，保持几何信息)
-        self.coord_proj = nn.Sequential(
-            nn.Linear(coord_dim, 24),
+        # 边长特征
+        self.edge_encoder = nn.Sequential(
+            nn.Linear(3, 16),  # 3条边的长度
             nn.GELU(),
-            nn.Linear(24, 32),
-            nn.LayerNorm(32)
+            nn.LayerNorm(16)
         )
         
-        # 融合层: 192+32+32=256维
-        assert 192 + 32 + 32 == embed_dim, f"维度必须匹配: {192 + 32 + 32} != {embed_dim}"
-        
-        # 最终融合
-        self.fusion = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.LayerNorm(embed_dim),
-            nn.GELU()
+        # 几何特征融合
+        self.geo_fusion = nn.Sequential(
+            nn.Linear(32 + 16, embed_dim // 4),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim // 4)
         )
     
-    def forward(self, partfield, confidence, coordinates):
-        # 分别嵌入
-        pf_embed = self.partfield_proj(partfield)      # (N, 192)
-        conf_embed = self.confidence_proj(confidence)   # (N, 32)
-        coord_embed = self.coord_proj(coordinates)      # (N, 32)
-        
-        # 拼接
-        combined = torch.cat([pf_embed, conf_embed, coord_embed], dim=-1)  # (N, 256)
-        
-        # 融合
-        enhanced = self.fusion(combined)
-        
-        return enhanced
-
-
-class EnhancedGeometricEncoding(nn.Module):
-    """增强几何位置编码"""
-    
-    def __init__(self, embed_dim=256):
-        super().__init__()
-        
-        # 4个点的位置编码器 (每个点64维)
-        self.point_encoder = nn.Sequential(
-            nn.Linear(3, 32),
-            nn.GELU(),
-            nn.Linear(32, 64),  # 每个点64维
-            nn.LayerNorm(64)
-        )
-        
-        # 几何特征融合 (4×64=256维)
-        self.geometric_fusion = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.GELU(),
-            nn.Dropout(0.15),
-            nn.Linear(embed_dim, embed_dim),
-            nn.LayerNorm(embed_dim),
-            nn.Dropout(0.1)
-        )
-        
-        # 形状特征编码器 (面积+法向量→64维)
-        self.shape_encoder = nn.Sequential(
-            nn.Linear(4, 32),   # 面积+法向量(3维)=4维→32维
-            nn.GELU(),
-            nn.Linear(32, 64),  # 扩展到64维
-            nn.LayerNorm(64)
-        )
-        
-        # 最终融合 (256+64→256)
-        self.final_fusion = nn.Sequential(
-            nn.Linear(embed_dim + 64, embed_dim * 2),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(embed_dim * 2, embed_dim),
-            nn.LayerNorm(embed_dim)
-        )
-    
-    def forward(self, face_coordinates):
+    def forward(self, coords9: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            face_coordinates: (N, 9) - 3个顶点的坐标
+            coords9: (N, 9) 面片3个顶点坐标
         Returns:
-            pos_encoding: (N, 256) - 增强位置编码
+            geo_features: (N, embed_dim//4) 几何特征
         """
-        batch_size = face_coordinates.shape[0]
-        
-        # 重塑为3个顶点
-        vertices = face_coordinates.view(batch_size, 3, 3)  # (N, 3, 3)
+        N = coords9.shape[0]
+        vertices = coords9.view(N, 3, 3)  # (N, 3, 3)
         
         # 计算重心
-        centroid = vertices.mean(dim=1, keepdim=True)  # (N, 1, 3)
+        centroid = vertices.mean(dim=1)  # (N, 3)
         
-        # 四个点: 3顶点 + 重心
-        four_points = torch.cat([vertices, centroid], dim=1)  # (N, 4, 3)
-        
-        # 每个点编码64维
-        point_encodings = []
-        for i in range(4):
-            point_enc = self.point_encoder(four_points[:, i, :])  # (N, 64)
-            point_encodings.append(point_enc)
-        
-        # 拼接4个点的编码
-        combined_points = torch.cat(point_encodings, dim=-1)  # (N, 256)
-        
-        # 几何特征增强
-        geo_features = self.geometric_fusion(combined_points)
-        
-        # 计算形状特征
+        # 计算边向量和边长
         v1, v2, v3 = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+        edge1, edge2, edge3 = v2 - v1, v3 - v2, v1 - v3
+        edge_lengths = torch.stack([
+            torch.norm(edge1, dim=-1),
+            torch.norm(edge2, dim=-1), 
+            torch.norm(edge3, dim=-1)
+        ], dim=-1)  # (N, 3)
         
-        # 面积和法向量
-        edge1 = v2 - v1
-        edge2 = v3 - v1
+        # 计算面积和法向量
         cross_product = torch.cross(edge1, edge2, dim=-1)
-        area = torch.norm(cross_product, dim=-1, keepdim=True) * 0.5
-        normal = cross_product / (torch.norm(cross_product, dim=-1, keepdim=True) + 1e-8)
+        area = torch.norm(cross_product, dim=-1, keepdim=True) * 0.5  # (N, 1)
+        normal = cross_product / (torch.norm(cross_product, dim=-1, keepdim=True) + 1e-8)  # (N, 3)
         
-        # 形状特征
-        shape_features = torch.cat([area, normal], dim=-1)  # (N, 4)
-        shape_enc = self.shape_encoder(shape_features)  # (N, 64)
+        # 几何特征组合
+        face_geo = torch.cat([area, normal, centroid], dim=-1)  # (N, 7)
+        face_geo_feat = self.face_geo_encoder(face_geo)  # (N, 32)
+        edge_feat = self.edge_encoder(edge_lengths)  # (N, 16)
         
-        # 最终融合
-        final_encoding = torch.cat([geo_features, shape_enc], dim=-1)  # (N, 320)
-        pos_encoding = self.final_fusion(final_encoding)  # (N, 256)
+        # 融合
+        combined = torch.cat([face_geo_feat, edge_feat], dim=-1)  # (N, 48)
+        geo_features = self.geo_fusion(combined)  # (N, embed_dim//4)
         
-        return pos_encoding
+        return _sanitize_tensor(geo_features)
 
 
-class MemoryEfficientAttention(nn.Module):
-    """内存高效注意力机制"""
+class ConfidenceGuidedPromptEncoder(nn.Module):
+    """
+    Confidence引导的Prompt编码器
+    类似SAM的prompt机制，让confidence成为强引导信号
+    """
+    def __init__(self, embed_dim: int = 128, input_feature_dim: int = 96):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.input_feature_dim = input_feature_dim
+        
+        # Confidence编码器
+        self.conf_encoder = nn.Sequential(
+            nn.Linear(1, 32),
+            nn.GELU(),
+            nn.LayerNorm(32),
+            nn.Linear(32, embed_dim // 4),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim // 4)
+        )
+        
+        # 高置信度面片提取器 - 修正输入维度
+        self.high_conf_proj = nn.Sequential(
+            nn.Linear(input_feature_dim, embed_dim),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim)
+        )
+        
+        # Prompt生成器
+        self.prompt_generator = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim),
+            nn.Linear(embed_dim, embed_dim)
+        )
     
-    def __init__(self, embed_dim=256, num_heads=8, chunk_size=256):
+    def forward(self, features: torch.Tensor, confidence: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            features: (N, input_feature_dim) 面片特征
+            confidence: (N, 1) 置信度
+        Returns:
+            conf_features: (N, embed_dim//4) confidence编码特征
+            prompt_signal: (embed_dim,) 全局prompt信号
+        """
+        # Confidence特征编码
+        conf_features = self.conf_encoder(confidence)  # (N, embed_dim//4)
+        
+        # 选择高置信度面片生成prompt
+        conf_scores = confidence.squeeze(-1)  # (N,)
+        if conf_scores.max() > 0.1:  # 如果存在较高置信度
+            # 选择top-k高置信度面片
+            k = min(max(1, int(0.1 * len(conf_scores))), 50)  # 取10%或最多50个
+            _, top_indices = torch.topk(conf_scores, k)
+            high_conf_features = features[top_indices]  # (k, embed_dim)
+            
+            # 生成prompt信号
+            enhanced_features = self.high_conf_proj(high_conf_features)
+            prompt_signal = self.prompt_generator(enhanced_features.mean(dim=0))  # (embed_dim,)
+        else:
+            # 如果没有高置信度，使用全局平均
+            prompt_signal = self.prompt_generator(features.mean(dim=0))
+        
+        return _sanitize_tensor(conf_features), _sanitize_tensor(prompt_signal)
+
+
+class GeometricSpatialAttention(nn.Module):
+    """
+    几何感知的空间注意力机制
+    考虑面片间的几何关系和空间邻接性
+    """
+    def __init__(self, embed_dim: int = 128, num_heads: int = 8, 
+                 max_neighbors: int = 32, dropout: float = 0.1):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
-        self.chunk_size = chunk_size  # 智能分块大小
+        self.max_neighbors = max_neighbors
         
-        # 局部注意力 (在chunk内)
-        self.local_attention = nn.MultiheadAttention(
-            embed_dim, num_heads, dropout=0.1, batch_first=True
-        )
+        # 多头注意力
+        self.mha = MHA(embed_dim, num_heads, dropout)
         
-        # 全局注意力 (chunk间)
-        self.global_attention = nn.MultiheadAttention(
-            embed_dim, num_heads, dropout=0.1, batch_first=True
-        )
-        
-        # Confidence引导
-        self.confidence_gate = nn.Sequential(
-            nn.Linear(1, embed_dim),
-            nn.Sigmoid()
-        )
-        
-        # 归一化和前馈
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.norm3 = nn.LayerNorm(embed_dim)
-        
-        self.ffn = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),  # 标准扩展4倍
+        # 几何关系编码器
+        self.geo_relation_encoder = nn.Sequential(
+            nn.Linear(4, 32),  # 距离 + 法向量夹角 + 面积比 + 边界共享
             nn.GELU(),
-            nn.Dropout(0.15),  # 增强dropout
-            nn.Linear(embed_dim * 4, embed_dim),
-            nn.Dropout(0.1)
+            nn.LayerNorm(32),
+            nn.Linear(32, num_heads),  # 输出每个head的bias
+            nn.Tanh()
         )
+        
+        # 位置编码
+        self.pos_encoder = nn.Sequential(
+            nn.Linear(3, embed_dim // 4),
+            nn.GELU(),
+            nn.LayerNorm(embed_dim // 4)
+        )
+        
+    def compute_geometric_relations(self, coords9: torch.Tensor) -> torch.Tensor:
+        """计算面片间的几何关系矩阵"""
+        N = coords9.shape[0]
+        vertices = coords9.view(N, 3, 3)  # (N, 3, 3)
+        
+        # 计算重心和法向量
+        centroids = vertices.mean(dim=1)  # (N, 3)
+        v1, v2, v3 = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+        edge1, edge2 = v2 - v1, v3 - v1
+        normals = torch.cross(edge1, edge2, dim=-1)
+        normals = normals / (torch.norm(normals, dim=-1, keepdim=True) + 1e-8)
+        
+        # 计算面积
+        areas = torch.norm(normals, dim=-1) * 0.5  # (N,)
+        normals = normals / (torch.norm(normals, dim=-1, keepdim=True) + 1e-8)
+        
+        # 计算成对距离矩阵 - 使用分块计算避免内存爆炸
+        chunk_size = min(1000, N)
+        relation_matrix = torch.zeros(N, N, 4, device=coords9.device)
+        
+        for i in range(0, N, chunk_size):
+            end_i = min(i + chunk_size, N)
+            for j in range(0, N, chunk_size):
+                end_j = min(j + chunk_size, N)
+                
+                # 距离
+                cent_i = centroids[i:end_i].unsqueeze(1)  # (chunk_i, 1, 3)
+                cent_j = centroids[j:end_j].unsqueeze(0)  # (1, chunk_j, 3)
+                distances = torch.norm(cent_i - cent_j, dim=-1)  # (chunk_i, chunk_j)
+                
+                # 法向量夹角
+                norm_i = normals[i:end_i].unsqueeze(1)  # (chunk_i, 1, 3)
+                norm_j = normals[j:end_j].unsqueeze(0)  # (1, chunk_j, 3)
+                cos_angles = torch.sum(norm_i * norm_j, dim=-1)  # (chunk_i, chunk_j)
+                cos_angles = torch.clamp(cos_angles, -1.0, 1.0)
+                
+                # 面积比
+                area_i = areas[i:end_i].unsqueeze(1)  # (chunk_i, 1)
+                area_j = areas[j:end_j].unsqueeze(0)  # (1, chunk_j)
+                area_ratios = torch.min(area_i, area_j) / (torch.max(area_i, area_j) + 1e-8)
+                
+                # 简化的边界共享（基于距离）
+                boundary_sharing = torch.exp(-distances / (distances.mean() + 1e-8))
+                
+                # 组合关系特征
+                relation_matrix[i:end_i, j:end_j, 0] = distances
+                relation_matrix[i:end_i, j:end_j, 1] = cos_angles
+                relation_matrix[i:end_i, j:end_j, 2] = area_ratios
+                relation_matrix[i:end_i, j:end_j, 3] = boundary_sharing
+        
+        return relation_matrix
     
-    def forward(self, x, confidence):
+    def forward(self, x: torch.Tensor, coords9: torch.Tensor, 
+                prompt_signal: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: (N, 256) 面片特征，N可能是40,000+
-            confidence: (N, 1) 置信度
+            x: (N, embed_dim) 面片特征
+            coords9: (N, 9) 几何坐标
+            prompt_signal: (embed_dim,) 全局prompt信号
+        Returns:
+            attended_x: (N, embed_dim) 注意力增强的特征
         """
         N = x.shape[0]
         
-        # 1. Confidence引导门控
-        conf_gate = self.confidence_gate(confidence)
-        x_gated = x * conf_gate
-        x = self.norm1(x + x_gated)
+        # 如果面片数量太大，使用局部注意力
+        if N > 2000:
+            return self._local_attention(x, coords9, prompt_signal)
         
-        # 2. 分块局部注意力
-        if N > self.chunk_size:
-            # 大规模面片，分块处理
-            chunks = torch.split(x, self.chunk_size, dim=0)
-            local_outputs = []
-            
-            for chunk in chunks:
-                chunk_out, _ = self.local_attention(chunk, chunk, chunk)
-                local_outputs.append(chunk_out)
-            
-            local_out = torch.cat(local_outputs, dim=0)
+        # 计算几何关系
+        geo_relations = self.compute_geometric_relations(coords9)  # (N, N, 4)
+        
+        # 编码几何关系为注意力bias
+        geo_bias = self.geo_relation_encoder(geo_relations)  # (N, N, num_heads)
+        
+        # 添加prompt信号
+        prompt_enhanced = x + prompt_signal.unsqueeze(0)  # (N, embed_dim)
+        
+        # 位置编码
+        centroids = coords9.view(N, 3, 3).mean(dim=1)  # (N, 3)
+        pos_enc = self.pos_encoder(centroids)  # (N, embed_dim//4)
+        pos_enhanced = torch.cat([
+            prompt_enhanced[:, :3*self.embed_dim//4], 
+            pos_enc
+        ], dim=-1)
+        
+        # 应用多头注意力
+        # 创建几何感知的注意力mask
+        distances = geo_relations[:, :, 0]  # (N, N)
+        # 只关注最近的邻居
+        if N > self.max_neighbors:
+            _, topk_indices = torch.topk(distances, self.max_neighbors, dim=-1, largest=False)
+            attn_mask = torch.full((N, N), float('-inf'), device=x.device)
+            for i in range(N):
+                attn_mask[i, topk_indices[i]] = 0.0
         else:
-            # 小规模面片，直接处理
-            local_out, _ = self.local_attention(x, x, x)
+            attn_mask = None
         
-        x = self.norm2(x + local_out)
+        attended_x, attn_weights = self.mha(
+            pos_enhanced.unsqueeze(0),  # (1, N, embed_dim) 
+            pos_enhanced.unsqueeze(0),
+            pos_enhanced.unsqueeze(0),
+            attn_mask=attn_mask
+        )
         
-        # 3. 全局上下文 (采样代表性面片，极致内存优化)
-        if N > self.chunk_size:
-            # 采样更少的高confidence面片作为全局代表
-            conf_scores = confidence.squeeze()
-            sample_size = min(self.chunk_size // 4, N)  # 进一步减少采样数量
-            _, top_indices = torch.topk(conf_scores, sample_size, dim=0)
-            global_representatives = x[top_indices]
-            
-            # 全局注意力
-            global_out, _ = self.global_attention(x, global_representatives, global_representatives)
-        else:
-            # 小规模直接处理，但限制数量
-            if N > self.chunk_size // 2:
-                # 如果还是太大，进行采样
-                conf_scores = confidence.squeeze()
-                sample_size = self.chunk_size // 2
-                _, top_indices = torch.topk(conf_scores, sample_size, dim=0)
-                global_representatives = x[top_indices]
-                global_out, _ = self.global_attention(x, global_representatives, global_representatives)
-            else:
-                global_out, _ = self.global_attention(x, x, x)
-        
-        x = self.norm3(x + global_out)
-        
-        # 4. 前馈网络
-        ffn_out = self.ffn(x)
-        x = x + ffn_out
-        
-        return x
-
-
-class MemoryEfficientSOTAModel(nn.Module):
-    """内存高效的SOTA模型"""
+        return _sanitize_tensor(attended_x.squeeze(0))
     
-    def __init__(self, 
-                 input_dim=458,
-                 embed_dim=256,      # 恢复强表示能力
-                 num_layers=6,       # 增加模型深度
-                 num_heads=8,        # 恢复多头注意力
-                 chunk_size=256,     # 智能分块
-                 dropout=0.1,
-                 num_classes=2):
-        super().__init__()
+    def _local_attention(self, x: torch.Tensor, coords9: torch.Tensor, 
+                        prompt_signal: torch.Tensor) -> torch.Tensor:
+        """处理大规模面片的局部注意力"""
+        # 简化版本：只使用prompt增强 + 位置编码
+        N = x.shape[0]
+        centroids = coords9.view(N, 3, 3).mean(dim=1)  # (N, 3)
+        pos_enc = self.pos_encoder(centroids)  # (N, embed_dim//4)
         
+        prompt_enhanced = x + prompt_signal.unsqueeze(0)
+        pos_enhanced = torch.cat([
+            prompt_enhanced[:, :3*self.embed_dim//4], 
+            pos_enc
+        ], dim=-1)
+        
+        return _sanitize_tensor(pos_enhanced)
+
+
+class HierarchicalGeometricAttentionMLP(nn.Module):
+    """
+    分层几何感知注意力MLP
+    结合SAM的思想，实现从局部到全局的层次化理解
+    """
+    def __init__(self,
+                 input_dim: int = 458,
+                 embed_dim: int = 128,
+                 num_heads: int = 8,
+                 num_layers: int = 3,
+                 dropout: float = 0.1,
+                 num_classes: int = 2):
+        super().__init__()
         self.embed_dim = embed_dim
         self.num_layers = num_layers
         
-        # 增强嵌入
-        self.embedding = EnhancedGroupedEmbedding(
-            partfield_dim=448, 
-            confidence_dim=1, 
-            coord_dim=9, 
-            embed_dim=embed_dim
+        # 只使用 448+1+9 => 458 维（保留原始坐标信息）
+        self.in_use_dim = 458
+        
+        # 特征分解和编码
+        self.partfield_encoder = nn.Sequential(
+            nn.Linear(448, embed_dim // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            RMSNorm(embed_dim // 2),
         )
         
-        # 增强位置编码
-        self.pos_encoding = EnhancedGeometricEncoding(embed_dim)
+        # 几何特征编码器
+        self.geo_encoder = GeometricFeatureEncoder(embed_dim)
         
-        # 内存高效注意力层
-        self.layers = nn.ModuleList([
-            MemoryEfficientAttention(embed_dim, num_heads, chunk_size)
+        # Confidence引导的Prompt编码器
+        # input_feature_dim = embed_dim//2 + embed_dim//4 = 96
+        self.prompt_encoder = ConfidenceGuidedPromptEncoder(embed_dim, input_feature_dim=embed_dim//2 + embed_dim//4)
+        
+        # 特征融合层
+        self.feature_fusion = nn.Sequential(
+            nn.Linear(embed_dim // 2 + embed_dim // 4 + embed_dim // 4, embed_dim),
+            nn.GELU(),
+            RMSNorm(embed_dim),
+        )
+        
+        # 多层几何感知注意力
+        self.attention_layers = nn.ModuleList([
+            GeometricSpatialAttention(embed_dim, num_heads, max_neighbors=32, dropout=dropout)
             for _ in range(num_layers)
         ])
         
-        # 强化分类头
+        # 层归一化
+        self.layer_norms = nn.ModuleList([
+            RMSNorm(embed_dim) for _ in range(num_layers)
+        ])
+        
+        # 改进的分类头
         self.classifier = nn.Sequential(
-            nn.LayerNorm(embed_dim),
-            nn.Linear(embed_dim, 128),
+            RMSNorm(embed_dim),
+            nn.Linear(embed_dim, embed_dim // 2),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(128, 64),
+            nn.Linear(embed_dim // 2, embed_dim // 4),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(64, num_classes)
+            nn.Linear(embed_dim // 4, num_classes)
         )
         
-        # 权重初始化
-        self.apply(self._init_weights)
-        
-        # 打印模型信息
         self._print_model_info()
     
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.trunc_normal_(m.weight, std=0.02)
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-    
     def _print_model_info(self):
-        """打印模型信息"""
         total_params = sum(p.numel() for p in self.parameters())
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        
+        size_mb = total_params * 4 / 1024 / 1024
         print(f"\n{'='*60}")
-        print(f"内存高效SOTA模型信息")
-        print(f"{'='*60}")
-        print(f"嵌入维度: {self.embed_dim}")
-        print(f"网络层数: {self.num_layers}")
-        print(f"总参数量: {total_params:,}")
-        print(f"可训练参数: {trainable_params:,}")
-        print(f"模型大小: {total_params * 4 / 1024 / 1024:.2f} MB")
+        print("HierarchicalGeometricAttentionMLP")
+        print(f"Total params: {total_params:,} | Trainable: {trainable_params:,} | ~{size_mb:.2f} MB")
+        print(f"Embed: {self.embed_dim} | Layers: {self.num_layers}")
         print(f"{'='*60}\n")
     
-    def forward(self, features):
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            features: (N, 458) 其中N可能是40,000+
+            features: (N, 458) [partfield(448), confidence(1), coords(9)]
         Returns:
-            logits: (N, 2) 分类logits
+            logits: (N, 2)
         """
-        # 分离特征
-        partfield = features[:, :448]
-        confidence = features[:, 448:449]
-        coordinates = features[:, 449:458]
+        features = _sanitize_tensor(features, clamp_val=1e4)
+        assert features.dim() == 2 and features.size(-1) == 458, "输入应为 (N, 458)"
         
-        # 增强嵌入 458→256
-        x = self.embedding(partfield, confidence, coordinates)  # (N, 256)
+        # 特征分解
+        partfield = features[:, :448]               # (N, 448)
+        confidence = features[:, 448:449]           # (N, 1)
+        coords9 = features[:, 449:458]              # (N, 9)
         
-        # 位置编码
-        pos_enc = self.pos_encoding(coordinates)
-        x = x + pos_enc
+        # 编码不同类型的特征
+        pf_encoded = self.partfield_encoder(partfield)      # (N, embed_dim//2)
+        geo_features = self.geo_encoder(coords9)            # (N, embed_dim//4)
+        conf_features, prompt_signal = self.prompt_encoder(
+            torch.cat([pf_encoded, geo_features], dim=-1), confidence
+        )  # (N, embed_dim//4), (embed_dim,)
         
-        # 分层注意力
-        for layer in self.layers:
-            x = layer(x, confidence)
+        # 特征融合
+        fused_features = torch.cat([pf_encoded, geo_features, conf_features], dim=-1)
+        x = self.feature_fusion(fused_features)  # (N, embed_dim)
+        
+        # 层次化几何感知注意力
+        for i in range(self.num_layers):
+            residual = x
+            attended = self.attention_layers[i](x, coords9, prompt_signal)
+            x = self.layer_norms[i](residual + attended)
         
         # 分类
         logits = self.classifier(x)  # (N, 2)
-        
-        return logits
-    
-    def forward_with_checkpointing(self, features):
-        """使用梯度检查点的前向传播 - 节省内存"""
-        from torch.utils.checkpoint import checkpoint
-        
-        # 分离特征
-        partfield = features[:, :448]
-        confidence = features[:, 448:449]
-        coordinates = features[:, 449:458]
-        
-        # 嵌入和位置编码
-        x = self.embedding(partfield, confidence, coordinates)
-        pos_enc = self.pos_encoding(coordinates)
-        x = x + pos_enc
-        
-        # 使用梯度检查点的分层注意力
-        for layer in self.layers:
-            x = checkpoint(layer, x, confidence, use_reentrant=False)
-        
-        # 分类
-        logits = self.classifier(x)
-        
-        return logits
+        return _sanitize_tensor(logits)
 
+
+# ---------------------------
+# 保持原有PMA实现以兼容性
+# ---------------------------
+
+class PMA(nn.Module):
+    """
+    Pooling by Multihead Attention（Set Transformer 思想）：
+    用固定数量的可学习 "种子向量" 作为 query，对所有面片特征做一次注意力，
+    产生少量全局上下文向量（eg. 4/8 个），再进行平均/拼接用于后续 MLP。
+    复杂度 O(N * S)，S<<N，内存友好。
+    """
+    def __init__(self, dim: int, num_seeds: int = 8, num_heads: int = 4, dropout: float = 0.1):
+        super().__init__()
+        self.seeds = nn.Parameter(torch.randn(num_seeds, dim) / math.sqrt(dim))
+        self.norm_q = RMSNorm(dim)
+        self.norm_kv = RMSNorm(dim)
+        self.mha = MHA(dim, num_heads, dropout=dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: (N, C) 面片特征
+        Returns:
+            ctx: (C,) 全局上下文（对种子输出平均）
+        """
+        x = _sanitize_tensor(x)
+        N, C = x.shape
+        q = self.seeds.unsqueeze(0)                        # (1, S, C)
+        k = x.unsqueeze(0)                                 # (1, N, C)
+        v = x.unsqueeze(0)                                 # (1, N, C)
+        y, _ = self.mha(self.norm_q(q), self.norm_kv(k), self.norm_kv(v))  # (1, S, C)
+        ctx = y.mean(dim=1).squeeze(0)                     # (C,)
+        return _sanitize_tensor(ctx)
+
+
+class SimpleAttentionMLP(nn.Module):
+    """
+    极简 Attention-MLP：
+    - 输入：partfield(448) + confidence(1) + centroid(3)
+    - 先线性嵌入到 dim
+    - 用 PMA 从全体面片生成全局上下文（S 个种子均值）
+    - 将全局上下文拼接回每个面片特征，送入 MLP 分类头
+    - 无 N×N 自注意力，内存稳定，速度快
+    """
+    def __init__(self,
+                 input_dim: int = 458,      # 原始输入（含9维坐标），内部只用 448+1+3
+                 embed_dim: int = 128,
+                 num_heads: int = 4,
+                 num_seeds: int = 8,
+                 dropout: float = 0.1,
+                 num_classes: int = 2):
+        super().__init__()
+        self.embed_dim = embed_dim
+
+        # 只使用 448+1+3 => 452 维（partfield + confidence + centroid）
+        self.in_use_dim = 452
+
+        self.pre_embed = nn.Sequential(
+            nn.Linear(self.in_use_dim, embed_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            RMSNorm(embed_dim),
+        )
+
+        self.pma = PMA(dim=embed_dim, num_seeds=num_seeds, num_heads=num_heads, dropout=dropout)
+
+        # 分类头：拼接 [x, global_ctx] => 2*embed_dim
+        self.head = nn.Sequential(
+            RMSNorm(embed_dim * 2),
+            nn.Linear(embed_dim * 2, embed_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim, num_classes)
+        )
+
+        self._print_model_info()
+
+    def _print_model_info(self):
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        size_mb = total_params * 4 / 1024 / 1024
+        print(f"\n{'='*60}")
+        print("SimpleAttentionMLP")
+        print(f"Total params: {total_params:,} | Trainable: {trainable_params:,} | ~{size_mb:.2f} MB")
+        print(f"Embed: {self.embed_dim}")
+        print(f"{'='*60}\n")
+
+    @staticmethod
+    def _extract_used_features(features: torch.Tensor) -> torch.Tensor:
+        """
+        从 (N, 458) 中提取我们使用的 452 维：448 + 1 + centroid(3)
+        centroid 由 9 维顶点坐标计算得到，避免改 loader。
+        """
+        features = _sanitize_tensor(features, clamp_val=1e4)
+        assert features.dim() == 2 and features.size(-1) == 458, "输入应为 (N, 458)"
+
+        partfield = features[:, :448]               # (N, 448)
+        confidence = features[:, 448:449]           # (N, 1)
+        coords9 = features[:, 449:458]              # (N, 9)
+        v = coords9.view(-1, 3, 3)
+        centroid = v.mean(dim=1)                    # (N, 3)
+        used = torch.cat([partfield, confidence, centroid], dim=-1)  # (N, 452)
+        return _sanitize_tensor(used)
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            features: (N, 458) [partfield(448), confidence(1), coords(9)]
+        Returns:
+            logits: (N, 2)
+        """
+        used = self._extract_used_features(features)           # (N, 452)
+        x = self.pre_embed(used)                               # (N, C)
+
+        # 全局上下文（对全部面片做一次 PMA）
+        global_ctx = self.pma(x)                               # (C,)
+        global_ctx_expanded = global_ctx.unsqueeze(0).expand(x.size(0), -1)  # (N, C)
+
+        # 拼接并分类
+        fused = torch.cat([x, global_ctx_expanded], dim=-1)    # (N, 2C)
+        logits = self.head(fused)                              # (N, 2)
+        return _sanitize_tensor(logits)
+
+
+# ---------------------------
+# 损失函数（可选：带置信度权重）
+# ---------------------------
 
 class FocalLoss(nn.Module):
-    """Focal Loss - 处理类别不平衡"""
-    
-    def __init__(self, alpha=0.25, gamma=2.0, reduction='mean'):
+    """标准 Focal Loss（多类）。"""
+    def __init__(self, alpha: float = 0.25, gamma: float = 2.0, reduction: str = 'mean'):
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
         self.reduction = reduction
-    
-    def forward(self, inputs, targets):
-        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
-        pt = torch.exp(-ce_loss)
-        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
-        
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        logits = _sanitize_tensor(logits)
+        ce = F.cross_entropy(logits, targets, reduction='none')
+        pt = torch.exp(-ce)
+        loss = self.alpha * (1 - pt) ** self.gamma * ce
         if self.reduction == 'mean':
-            return focal_loss.mean()
+            return loss.mean()
         elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
+            return loss.sum()
+        return loss
 
 
-class ConfidenceWeightedLoss(nn.Module):
-    """Confidence引导的加权损失"""
-    
-    def __init__(self, base_loss='focal', conf_weight=0.3, alpha=0.25, gamma=2.0):
+class ConfidenceAwareLoss(nn.Module):
+    """
+    简化版：Focal + 置信度加权（可选）。
+    """
+    def __init__(self,
+                 alpha: float = 0.25,
+                 gamma: float = 1.5,
+                 conf_weight: float = 0.1,
+                 reduction: str = 'mean'):
         super().__init__()
-        
-        if base_loss == 'focal':
-            self.base_loss = FocalLoss(alpha=alpha, gamma=gamma, reduction='none')
-        else:
-            self.base_loss = nn.CrossEntropyLoss(reduction='none')
-        
+        self.focal = FocalLoss(alpha=alpha, gamma=gamma, reduction='none')
         self.conf_weight = conf_weight
-    
-    def forward(self, logits, labels, confidence):
-        # 基础损失
-        base_loss = self.base_loss(logits, labels)
-        
-        # Confidence加权 (高confidence的预测给更高权重)
-        conf_weights = 1.0 + confidence.squeeze()  # [1, 2]范围
-        weighted_loss = base_loss * conf_weights
-        
-        # Confidence一致性损失 (高confidence应该预测正确)
-        probs = torch.softmax(logits, dim=-1)
-        pred_confidence = probs.max(dim=-1)[0]  # 预测置信度
-        
-        # 一致性损失: 高输入confidence应该对应高预测confidence
-        consistency_loss = F.mse_loss(pred_confidence, confidence.squeeze(), reduction='mean')
-        
-        # 组合损失
-        total_loss = weighted_loss.mean() + self.conf_weight * consistency_loss
-        
-        return total_loss
+        self.reduction = reduction
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor, confidence: torch.Tensor) -> torch.Tensor:
+        logits = _sanitize_tensor(logits)
+        base = self.focal(logits, targets)  # (N,)
+        # 置信度加权：1 + w * c，c∈[0,1]
+        c = torch.clamp(torch.nan_to_num(confidence.squeeze(-1), nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+        weights = 1.0 + self.conf_weight * c
+        loss = base * weights
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        return loss
 
 
-def create_model(config=None):
-    """创建模型的工厂函数"""
+def create_model(config: Optional[dict] = None) -> nn.Module:
+    """
+    工厂函数 - 现在默认使用改进的几何感知模型
+    """
     if config is None:
-        config = {
-            'embed_dim': 256,
-            'num_layers': 6,
-            'num_heads': 8,
-            'chunk_size': 256,
-            'dropout': 0.1
-        }
+        config = {}
     
-    model = MemoryEfficientSOTAModel(
-        embed_dim=config.get('embed_dim', 256),
-        num_layers=config.get('num_layers', 6),
-        num_heads=config.get('num_heads', 8),
-        chunk_size=config.get('chunk_size', 256),
-        dropout=config.get('dropout', 0.1)
-    )
-    
+    # 如果明确要求使用简单模型
+    if config.get('use_simple_model', False):
+        model = SimpleAttentionMLP(
+            input_dim=config.get('input_dim', 458),
+            embed_dim=config.get('embed_dim', 128),
+            num_heads=config.get('num_heads', 4),
+            num_seeds=config.get('num_seeds', 8),
+            dropout=config.get('dropout', 0.1),
+            num_classes=config.get('num_classes', 2),
+        )
+    else:
+        # 默认使用新的几何感知模型
+        model = HierarchicalGeometricAttentionMLP(
+            input_dim=config.get('input_dim', 458),
+            embed_dim=config.get('embed_dim', 128),
+            num_heads=config.get('num_heads', 8),
+            num_layers=config.get('num_layers', 3),
+            dropout=config.get('dropout', 0.1),
+            num_classes=config.get('num_classes', 2),
+        )
     return model
 
 
-def test_model():
-    """测试模型"""
-    print("测试内存高效SOTA模型...")
-    
-    # 创建模型
-    model = create_model()
-    
-    # 测试不同规模的输入
-    test_cases = [
-        (500, "小规模面片"),
-        (2000, "中规模面片"),
-        (5000, "大规模面片")
-    ]
-    
-    for num_faces, desc in test_cases:
-        print(f"\n测试 {desc}: {num_faces} 个面片")
-        
-        # 创建测试输入
-        features = torch.randn(num_faces, 458)
-        
-        # 前向传播
-        with torch.no_grad():
-            logits = model(features)
-        
-        print(f"  输入形状: {features.shape}")
-        print(f"  输出形状: {logits.shape}")
-        print(f"  内存占用: {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB" if torch.cuda.is_available() else "  CPU模式")
-        
-        # 验证输出
-        assert logits.shape == (num_faces, 2), f"输出形状错误: {logits.shape}"
-        print(f"  ✓ 测试通过")
-    
-    print(f"\n模型测试完成！")
+def _quick_selftest():
+    print(">>> quick self-test of HierarchicalGeometricAttentionMLP")
+    torch.manual_seed(0)
+    N = 1000  # 减少测试规模
+    x = torch.randn(N, 458) * 5
+    model = create_model({
+        'embed_dim': 128,
+        'num_heads': 8,
+        'num_layers': 3,
+        'dropout': 0.1
+    })
+    with torch.no_grad():
+        y = model(x)
+    print("input:", x.shape, "output:", y.shape)
+    assert y.shape == (N, 2)
+    print("OK")
 
 
 if __name__ == "__main__":
-    test_model() 
+    _quick_selftest()

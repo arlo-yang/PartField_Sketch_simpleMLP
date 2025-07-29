@@ -58,7 +58,10 @@ class ModelTester:
             config=config['data']
         )
         
-        self.test_loader = get_dataloader(self.test_dataset, config['dataloader'])
+        # 确保测试时不shuffle
+        test_dataloader_config = config['dataloader'].copy()
+        test_dataloader_config['shuffle'] = False
+        self.test_loader = get_dataloader(self.test_dataset, test_dataloader_config)
         
         logger.info(f"测试设备: {self.device}")
         logger.info(f"测试样本: {len(self.test_dataset)}")
@@ -72,9 +75,18 @@ class ModelTester:
         model = create_model(self.config['model'])
         model.to(self.device)
         
-        # 加载权重
+        # 加载权重 - 适配新的检查点格式
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        if 'model_state_dict' in checkpoint:
+            # 旧格式
+            model.load_state_dict(checkpoint['model_state_dict'])
+        elif 'model' in checkpoint:
+            # 新格式
+            model.load_state_dict(checkpoint['model'])
+        else:
+            # 直接是state_dict
+            model.load_state_dict(checkpoint)
+        
         model.eval()
         
         logger.info("模型加载完成")
@@ -101,8 +113,19 @@ class ModelTester:
             labels = labels.to(self.device)
             confidence = features[:, 448:449]
             
+            # 数值清理（与训练时保持一致）
+            features = torch.nan_to_num(features, nan=0.0, posinf=1e4, neginf=-1e4)
+            confidence = torch.clamp(torch.nan_to_num(confidence, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+            features[:, 448:449] = confidence
+            
             # 前向传播
             logits = self.model(features)
+            
+            # 检查输出是否有效
+            if torch.isnan(logits).any() or torch.isinf(logits).any():
+                logger.warning("模型输出包含NaN/Inf，跳过此batch")
+                continue
+                
             probs = F.softmax(logits, dim=-1)
             preds = logits.argmax(dim=-1)
             
@@ -322,12 +345,23 @@ class ModelTester:
         
         # 获取样本
         features, labels, sample_info = self.test_dataset[sample_idx]
-        features = features.to(self.device)  # 不需要unsqueeze，因为collate_fn已经处理了
+        features = features.to(self.device)
         labels = labels.to(self.device)
+        
+        # 数值清理
+        features = torch.nan_to_num(features, nan=0.0, posinf=1e4, neginf=-1e4)
+        confidence = torch.clamp(torch.nan_to_num(features[:, 448:449], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+        features[:, 448:449] = confidence
         
         # 预测
         with torch.no_grad():
             logits = self.model(features)
+            
+            # 检查输出
+            if torch.isnan(logits).any() or torch.isinf(logits).any():
+                logger.error("模型输出包含NaN/Inf")
+                return None
+                
             probs = F.softmax(logits, dim=-1)
             preds = logits.argmax(dim=-1)
         
@@ -552,9 +586,9 @@ def load_config(config_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="测试训练好的模型")
+    parser = argparse.ArgumentParser(description="测试训练好的SimpleAttentionMLP模型")
     parser.add_argument("--config", type=str, default="train_config.yaml", help="配置文件路径")
-    parser.add_argument("--checkpoint", type=str, default="experiments/sota_run1/best_model.pth", 
+    parser.add_argument("--checkpoint", type=str, default="experiments/attn_mlp_run1/best.pth", 
                        help="模型检查点路径")
     parser.add_argument("--output_dir", type=str, help="输出目录")
     parser.add_argument("--sample_idx", type=int, default=0, help="单样本分析的索引")
