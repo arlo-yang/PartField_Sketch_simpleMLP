@@ -24,3 +24,13 @@ model_ids.txt删除一些文件。
 9. img_pred，npy应该不需要动 这俩是图片域的,之前通过/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/segmentation2/all_confidence.py生成，是固定的问题不大
 
 10. 可以check一下是不是面片confidence和几何体对应上。不要搞乱了 
+
+11. 运行samesh_modi 的projection得到result，我们获得面片的confidence
+
+12. 我们现在的data_small有： imr_pred, npy, urdf, result
+
+13. 运行data_small下面的mesh_point.py。获得每一个面片对应的3个顶点的3D坐标
+
+14. 我们需要partfield + confidence + position --> 0 / 1 face prediction,
+可以看到/home/ipab-graphics/workplace/PartField_Sketch_simpleMLP/data_small_train/NOTE.md,这里写了具体的操作，
+以及一个复制的脚本copy_training_data.py
